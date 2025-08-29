@@ -1,33 +1,37 @@
-// components/home/DeviceCard.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { ReactElement } from "react";
+import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Colors } from "../../constants/Colors";
 
-type DeviceCardProps = {
-  icon: ReactElement; // Menerima JSX element (SVG)
+interface DeviceCardProps {
   name: string;
+  icon: React.ReactNode;
   onPress: () => void;
-};
+}
 
-export default function DeviceCard({ icon, name, onPress }: DeviceCardProps) {
+const DeviceCard: React.FC<DeviceCardProps> = ({ name, icon, onPress }) => {
   return (
     <TouchableOpacity
-      className="w-48 h-60 rounded-[25px] bg-white shadow-md shadow-black/10"
       onPress={onPress}
+      activeOpacity={0.8}
+      className="bg-white rounded-3xl w-48 h-60 p-5 shadow-lg shadow-black/10 justify-between"
     >
-      {/* Bagian Atas (SVG atau Ikon) */}
-      <View className="w-full h-[130px] bg-offWhite rounded-t-[25px] justify-center items-center p-2.5">
-        {icon}
+      {/* Container untuk Ikon dan Nama */}
+      <View>
+        <View className="w-20 h-20 items-center justify-center">{icon}</View>
+        <Text className="font-poppins-semibold text-xl text-text mt-4 leading-6">
+          {name}
+        </Text>
       </View>
 
-      {/* Bagian Bawah (Teks dan Tombol) */}
-      <View className="flex-1 flex-row justify-between items-center px-4">
-        <Text className="font-poppins-bold text-lg text-text">{name}</Text>
-        <View className="bg-background w-[30px] h-[30px] rounded-full justify-center items-center">
-          <Ionicons name="arrow-forward" size={18} color={Colors.primary} />
+      {/* Container untuk Tombol Panah */}
+      <View className="items-end">
+        <View className="bg-primary rounded-full w-10 h-10 justify-center items-center">
+          <Ionicons name="arrow-forward" size={22} color={Colors.white} />
         </View>
       </View>
     </TouchableOpacity>
   );
-}
+};
+
+export default DeviceCard;

@@ -1,49 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  LayoutAnimation,
-  Platform,
   Pressable,
   StatusBar,
   Text,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import resolveConfig from "tailwindcss/resolveConfig";
-import {
-  controlDevice,
-  getDeviceSettings,
-  getLatestDeviceStatus,
-  updateDeviceSettings,
-} from "../api/device";
+import { controlDevice, updateDeviceSettings } from "../api/device";
 import FanIcon from "../assets/images/fandua.svg";
 import { Colors } from "../constants/Colors";
+import { useDevices } from "../context/DeviceContext";
 import tailwindConfig from "../tailwind.config.js";
-
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const fullConfig = resolveConfig(tailwindConfig);
 const themeColors = fullConfig.theme.colors as any;
-
-type FanStatus = "on" | "off";
-
 const TRACK_WIDTH = 76;
 const TRACK_HEIGHT = 40;
 const THUMB_SIZE = 32;
 const PADDING = 4;
 
-// --- Komponen CustomSwitch (Tidak ada perubahan) ---
 interface CustomSwitchProps {
   value: boolean;
   onValueChange: () => void;
@@ -75,23 +57,6 @@ const CustomSwitch: React.FC<CustomSwitchProps> = ({
     outputRange: [themeColors.border, themeColors.primary],
   });
 
-  const sunIconOpacity = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-  const sunIconScale = animatedValue.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0, 0.5, 1],
-  });
-  const moonIconOpacity = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const moonIconScale = animatedValue.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.5, 0],
-  });
-
   return (
     <Pressable
       onPress={onValueChange}
@@ -111,77 +76,12 @@ const CustomSwitch: React.FC<CustomSwitchProps> = ({
             transform: [{ translateX }],
             elevation: 5,
           }}
-        >
-          <Animated.View
-            className="absolute"
-            style={{
-              opacity: moonIconOpacity,
-              transform: [{ scale: moonIconScale }],
-            }}
-          >
-            <Ionicons name="moon" size={18} color={themeColors.textLight} />
-          </Animated.View>
-          <Animated.View
-            className="absolute"
-            style={{
-              opacity: sunIconOpacity,
-              transform: [{ scale: sunIconScale }],
-            }}
-          >
-            <Ionicons name="sunny" size={18} color={themeColors.lampOnColor} />
-          </Animated.View>
-        </Animated.View>
+        />
       </Animated.View>
     </Pressable>
   );
 };
 
-// --- Hook useDeviceSync disesuaikan untuk Kipas ---
-const useDeviceSync = (deviceId: string) => {
-  const [fanStatus, setFanStatus] = useState<FanStatus>("off");
-  const [isAutoMode, setIsAutoMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!deviceId) {
-      setIsLoading(false);
-      return;
-    }
-
-    const getInitialStatus = async () => {
-      try {
-        const [settingsRes, statusRes] = await Promise.all([
-          getDeviceSettings(deviceId),
-          getLatestDeviceStatus(deviceId),
-        ]);
-
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        if (settingsRes) {
-          setIsAutoMode(settingsRes.autoModeEnabled);
-        }
-        if (statusRes && statusRes.data && statusRes.data.length > 0) {
-          // Mengambil fanStatus, bukan lightStatus
-          setFanStatus(statusRes.data[0].fanStatus);
-        }
-      } catch (error) {
-        console.error("Fetch initial status error:", error);
-        Alert.alert("Error", "Failed to fetch initial status from the server.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getInitialStatus();
-
-    const intervalId = setInterval(getInitialStatus, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [deviceId]);
-
-  return { fanStatus, setFanStatus, isAutoMode, setIsAutoMode, isLoading };
-};
-
-// --- Komponen StatusItem (Tidak ada perubahan) ---
 const StatusItem: React.FC<{
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -204,51 +104,55 @@ const StatusItem: React.FC<{
   </View>
 );
 
-// --- Komponen Utama FanControlScreen ---
 export default function FanControlScreen() {
   const insets = useSafeAreaInsets();
   const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
+  const router = useRouter();
 
-  const { fanStatus, setFanStatus, isAutoMode, setIsAutoMode, isLoading } =
-    useDeviceSync(deviceId);
+  const { getDeviceById, isLoading: isContextLoading } = useDevices();
+
+  const [isActionLoading, setActionLoading] = useState(false);
+
+  const device = getDeviceById(deviceId);
+
+  useEffect(() => {
+    if (!isContextLoading && !device) {
+      Alert.alert("Error", "Device not found or failed to load.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    }
+  }, [isContextLoading, device, router]);
 
   const handleAutoModeToggle = async () => {
-    if (!deviceId) return;
-    const newMode = !isAutoMode;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-    setIsAutoMode(newMode);
-    const response = await updateDeviceSettings(deviceId, {
-      autoModeEnabled: newMode,
+    if (!device) return;
+    setActionLoading(true);
+    await updateDeviceSettings(deviceId, {
+      autoModeEnabled: !device.setting.autoModeEnabled,
     });
-    if (!response) {
-      setIsAutoMode(!newMode);
-    }
+    setActionLoading(false);
   };
 
   const handleFanToggle = async () => {
-    if (!deviceId || isAutoMode) return;
-    const newStatus: FanStatus = fanStatus === "on" ? "off" : "on";
-    const action = newStatus === "on" ? "turn_on" : "turn_off";
-
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setFanStatus(newStatus);
-
-    const response = await controlDevice(deviceId, action);
-    if (!response) {
-      setFanStatus(fanStatus);
-    }
+    if (!device || device.setting.autoModeEnabled) return;
+    setActionLoading(true);
+    const action = device.operationalStatus === "on" ? "turn_off" : "turn_on";
+    await controlDevice(deviceId, action);
+    setActionLoading(false);
   };
 
-  const isFanOn = fanStatus === "on";
-
-  if (isLoading) {
+  if (isContextLoading || !device) {
     return (
       <View className="flex-1 justify-center items-center bg-secondary">
         <ActivityIndicator size="large" color={Colors.white} />
-        <Text className="mt-2.5 text-white text-base">Loading Status...</Text>
+        <Text className="mt-2.5 text-white text-base">
+          Loading Device Status...
+        </Text>
       </View>
     );
   }
+
+  const isFanOn = device.operationalStatus === "on";
+  const isAutoMode = device.setting.autoModeEnabled;
 
   return (
     <View
@@ -290,11 +194,10 @@ export default function FanControlScreen() {
         <View className="w-full items-center px-6 pt-5 pb-16">
           <View className="w-[50px] h-[5px] bg-border rounded-full mb-6" />
 
-          {/* Manual Power Button */}
           <TouchableOpacity
             className={`w-24 h-24 rounded-full justify-center items-center bg-secondary shadow-lg shadow-primary/30 mb-2.5 border-2 border-white ${isAutoMode ? "bg-border" : ""}`}
             onPress={handleFanToggle}
-            disabled={isAutoMode}
+            disabled={isAutoMode || isActionLoading}
             activeOpacity={0.7}
           >
             <Ionicons
@@ -304,7 +207,9 @@ export default function FanControlScreen() {
             />
           </TouchableOpacity>
           <Text
-            className={`font-poppins-semibold text-base font-semibold mb-6 ${isFanOn ? "text-greenDot" : "text-textLight"}`}
+            className={`font-poppins-semibold text-base font-semibold mb-6 ${
+              isFanOn ? "text-greenDot" : "text-textLight"
+            }`}
           >
             Fan is {isFanOn ? "On" : "Off"}
           </Text>
@@ -341,6 +246,7 @@ export default function FanControlScreen() {
             <CustomSwitch
               value={isAutoMode}
               onValueChange={handleAutoModeToggle}
+              disabled={isActionLoading}
             />
           </View>
         </View>

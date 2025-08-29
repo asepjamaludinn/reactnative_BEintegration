@@ -56,7 +56,6 @@ const logStyleConfig = {
   },
 };
 
-// Komponen untuk menampilkan satu item log
 const LogItem: React.FC<{ item: HistoryLog }> = ({ item }) => {
   const style = logStyleConfig[item.triggerType];
   const isLamp = item.device.deviceName.toLowerCase().includes("lamp");
@@ -67,7 +66,7 @@ const LogItem: React.FC<{ item: HistoryLog }> = ({ item }) => {
     <View className="flex-row items-center bg-white rounded-2xl p-4 mb-3 shadow shadow-black/5">
       <View
         className="w-12 h-12 rounded-full justify-center items-center mr-4"
-        style={{ backgroundColor: `${style.color}20` }} // Opacity 20%
+        style={{ backgroundColor: `${style.color}20` }}
       >
         <Ionicons name={style.icon} size={24} color={style.color} />
       </View>
@@ -90,12 +89,12 @@ const LogItem: React.FC<{ item: HistoryLog }> = ({ item }) => {
 };
 
 export default function HistoryScreen() {
-  const insets = useSafeAreaInsets();
   const [logs, setLogs] = useState<HistoryLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterVisible, setFilterVisible] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -129,8 +128,18 @@ export default function HistoryScreen() {
     },
   ];
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
   const fetchHistoryData = useCallback(
-    async (filter: FilterType, page: number) => {
+    async (filter: FilterType, page: number, searchTerm: string) => {
       setIsLoading(true);
       const params = new URLSearchParams({
         page: String(page),
@@ -146,6 +155,10 @@ export default function HistoryScreen() {
       if (filter === "lamp-off") params.append("lightAction", "turned_off");
       if (filter === "fan-on") params.append("fanAction", "turned_on");
       if (filter === "fan-off") params.append("fanAction", "turned_off");
+
+      if (searchTerm) {
+        params.append("search", searchTerm.trim());
+      }
 
       const response = await getHistory(params);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -166,8 +179,8 @@ export default function HistoryScreen() {
   );
 
   useEffect(() => {
-    fetchHistoryData(activeFilter, pagination.page);
-  }, [activeFilter, pagination.page, fetchHistoryData]);
+    fetchHistoryData(activeFilter, pagination.page, debouncedSearchQuery);
+  }, [activeFilter, pagination.page, debouncedSearchQuery, fetchHistoryData]);
 
   const handleSelectFilter = (filter: FilterType) => {
     setActiveFilter(filter);
@@ -210,7 +223,7 @@ export default function HistoryScreen() {
             No History Found
           </Text>
           <Text className="font-roboto-regular text-sm text-textLight mt-1">
-            Try selecting a different filter.
+            Try a different search or filter.
           </Text>
         </View>
       ) : (

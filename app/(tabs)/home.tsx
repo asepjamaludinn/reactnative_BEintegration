@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -10,11 +10,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getProfile } from "../../api/auth";
-import { getDevices } from "../../api/device";
 import FanIcon from "../../assets/images/fandua.svg";
 import LamphomeIcon from "../../assets/images/leddua.svg";
 import DeviceCard from "../../components/home/DeviceCard";
 import { Colors } from "../../constants/Colors";
+import { useDevices } from "../../context/DeviceContext";
 
 type Device = {
   id: string;
@@ -25,32 +25,20 @@ type Device = {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { devices, isLoading } = useDevices();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [userName, setUserName] = useState("User");
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      // Ambil data profil dan perangkat secara bersamaan
-      const [profileResponse, devicesResponse] = await Promise.all([
-        getProfile(),
-        getDevices(),
-      ]);
-
+    const loadProfileData = async () => {
+      const profileResponse = await getProfile();
       if (profileResponse && profileResponse.user) {
         setUserName(profileResponse.user.username);
       }
-
-      if (devicesResponse && devicesResponse.devices) {
-        setDevices(devicesResponse.devices);
-      }
-      setIsLoading(false);
     };
 
-    loadData();
+    loadProfileData();
 
     const timer = setInterval(() => {
       const now = new Date();
@@ -70,7 +58,6 @@ export default function HomeScreen() {
   }, []);
 
   const handleDevicePress = (device: Device) => {
-    // Arahkan berdasarkan tipe perangkat
     if (device.deviceTypes.includes("lamp")) {
       router.push({
         pathname: "/lamp-control",
@@ -92,12 +79,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Header Section */}
       <View
         className="bg-secondary h-[380px] rounded-b-[40px] px-6 pb-5 absolute top-0 left-0 right-0 z-10 justify-between shadow-lg shadow-black/25"
         style={{ paddingTop: insets.top + 10 }}
       >
-        {/* Top Header Content */}
         <View>
           <Text
             className="font-poppins-bold text-3xl text-white mt-16"
@@ -119,8 +104,6 @@ export default function HomeScreen() {
             </Text>
           </Text>
         </View>
-
-        {/* Bottom Header Content */}
         <View className="flex-row justify-between items-end mt-2.5">
           <Text className="font-poppins-regular text-base text-white">
             #LightsUpWhenLifeMoves
@@ -138,7 +121,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Scrollable Content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: HEADER_HEIGHT }}
@@ -163,6 +145,7 @@ export default function HomeScreen() {
           >
             Devices
           </Text>
+
           {isLoading ? (
             <ActivityIndicator
               size="large"

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -11,26 +12,32 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-// --- PERUBAHAN ---
-import { getProfile, UserRole } from "../api/auth";
+import {
+  getProfile,
+  updateProfile,
+  uploadProfilePicture,
+  UserRole,
+} from "../api/auth";
 import AboutAppModal from "../components/modal/about-app";
 import { ChangeNameModal } from "../components/modal/ChangeNameModal";
 import { ChangePasswordModal } from "../components/modal/ChangePasswordModal";
 import { Colors } from "../constants/Colors";
 
-// --- BARU: Tipe untuk data pengguna ---
 type UserData = {
+  id: string;
   username: string;
   email: string;
   profilePict: string | null;
   role: UserRole;
+  updatedAt: string;
 };
 
 const AccountSettingsScreen: React.FC = () => {
   const router = useRouter();
-  // --- PERUBAHAN: Gunakan state untuk data dinamis ---
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [isPasswordModalVisible, setPasswordModalVisible] =
     useState<boolean>(false);
@@ -39,17 +46,16 @@ const AccountSettingsScreen: React.FC = () => {
   const [isNameModalVisible, setNameModalVisible] = useState<boolean>(false);
   const insets = useSafeAreaInsets();
 
-  // --- BARU: useEffect untuk fetch data saat komponen dimuat ---
-  useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true);
-      const response = await getProfile();
-      if (response && response.user) {
-        setUserData(response.user);
-      }
-      setIsLoading(false);
-    };
+  const fetchUserData = async () => {
+    setIsLoading(true);
+    const response = await getProfile();
+    if (response && response.user) {
+      setUserData(response.user);
+    }
+    setIsLoading(false);
+  };
 
+  useEffect(() => {
     fetchUserData();
   }, []);
 
@@ -59,6 +65,10 @@ const AccountSettingsScreen: React.FC = () => {
       {
         text: "Yes",
         onPress: async () => {
+          const role = await AsyncStorage.getItem("userRole");
+          if (role === "SUPERUSER") {
+            await AsyncStorage.setItem("justLoggedOut", "true");
+          }
           await AsyncStorage.multiRemove(["userToken", "userRole"]);
           router.replace("/(auth)/login");
         },
@@ -67,29 +77,75 @@ const AccountSettingsScreen: React.FC = () => {
   };
 
   const handleChangeProfilePicture = async () => {
-    // ... (logika ini bisa dihubungkan ke API uploadProfilePicture nanti)
-    Alert.alert("Coming Soon", "This feature is under development.");
-  };
-
-  const handleSubmitPasswordChange = (passwords: {
-    current: string;
-    new: string;
-  }) => {
-    // ... (logika ini bisa dihubungkan ke API updateProfile nanti)
-    console.log("Password data to send to backend:", passwords);
-    Alert.alert("Success", "Your password has been changed successfully!");
-  };
-
-  const handleSubmitNameChange = (newName: string) => {
-    // ... (logika ini bisa dihubungkan ke API updateProfile nanti)
-    if (userData) {
-      setUserData({ ...userData, username: newName });
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need permission to access your photos to set a profile picture."
+      );
+      return;
     }
-    setNameModalVisible(false);
-    Alert.alert("Name Updated", "Your name has been successfully changed.");
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const localUri = asset.uri;
+    const filename = localUri.split("/").pop() || "profile.jpg";
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : `image`;
+
+    const formData = new FormData();
+    formData.append("profilePict", {
+      uri: localUri,
+      name: filename,
+      type,
+    } as any);
+
+    setIsUploading(true);
+    const response = await uploadProfilePicture(formData);
+    setIsUploading(false);
+
+    if (response && response.user) {
+      setUserData((prevData) =>
+        prevData ? { ...prevData, ...response.user } : null
+      );
+      Alert.alert("Success", "Profile picture has been updated!");
+    }
   };
 
-  // --- BARU: Tampilkan loading indicator ---
+  const handleSubmitPasswordChange = async (passwords: { new: string }) => {
+    setIsSubmitting(true);
+    const response = await updateProfile({ password: passwords.new });
+    setIsSubmitting(false);
+    if (response) {
+      setPasswordModalVisible(false);
+      Alert.alert("Success", "Your password has been changed successfully!");
+    }
+  };
+
+  const handleSubmitNameChange = async (newName: string) => {
+    if (!newName.trim()) return;
+    setIsSubmitting(true);
+    const response = await updateProfile({ username: newName });
+    setIsSubmitting(false);
+    if (response && response.user) {
+      setUserData((prevData) =>
+        prevData ? { ...prevData, ...response.user } : null
+      );
+      setNameModalVisible(false);
+      Alert.alert("Success", "Your name has been updated successfully.");
+    }
+  };
+
   if (isLoading) {
     return (
       <View className="flex-1 justify-center items-center bg-secondary">
@@ -107,7 +163,6 @@ const AccountSettingsScreen: React.FC = () => {
         <View className="items-center justify-center mt-12">
           <View>
             <Image
-              // --- PERUBAHAN: Gunakan gambar dari state ---
               source={
                 userData?.profilePict
                   ? { uri: userData.profilePict }
@@ -115,14 +170,19 @@ const AccountSettingsScreen: React.FC = () => {
               }
               className="w-[110px] h-[110px] rounded-full border-4 border-white/80"
             />
+            {isUploading && (
+              <View className="absolute inset-0 bg-black/50 rounded-full justify-center items-center">
+                <ActivityIndicator color={Colors.white} />
+              </View>
+            )}
             <TouchableOpacity
               className="absolute bottom-0.5 right-0.5 bg-primary rounded-full w-[30px] h-[30px] justify-center items-center border-2 border-white"
               onPress={handleChangeProfilePicture}
+              disabled={isUploading}
             >
               <Ionicons name="add" size={20} color={Colors.white} />
             </TouchableOpacity>
           </View>
-          {/* --- PERUBAHAN: Gunakan nama dari state --- */}
           <Text className="text-white text-3xl font-poppins-semibold mt-4">
             {userData?.username || "User"}
           </Text>
@@ -144,7 +204,6 @@ const AccountSettingsScreen: React.FC = () => {
               <Text className="text-lg font-poppins-semibold text-text">
                 Email
               </Text>
-              {/* --- PERUBAHAN: Gunakan email dari state --- */}
               <Text className="text-base text-textLight">
                 {userData?.email || "..."}
               </Text>
@@ -166,7 +225,6 @@ const AccountSettingsScreen: React.FC = () => {
               <Text className="text-lg font-poppins-semibold text-text">
                 Name
               </Text>
-              {/* --- PERUBAHAN: Gunakan nama dari state --- */}
               <Text className="text-base text-textLight">
                 {userData?.username}
               </Text>
@@ -178,7 +236,6 @@ const AccountSettingsScreen: React.FC = () => {
             />
           </TouchableOpacity>
 
-          {/* (Sisa komponen lainnya tetap sama) */}
           {/* Password */}
           <TouchableOpacity
             className="flex-row items-center py-4 border-b border-border"
@@ -206,7 +263,6 @@ const AccountSettingsScreen: React.FC = () => {
           </TouchableOpacity>
 
           {/* Add Account (Conditional) */}
-          {/* --- PERUBAHAN: Gunakan role dari state --- */}
           {userData?.role === "SUPERUSER" && (
             <TouchableOpacity
               className="flex-row items-center py-4 border-b border-border"
@@ -269,11 +325,11 @@ const AccountSettingsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Modal Components */}
       <ChangePasswordModal
         visible={isPasswordModalVisible}
         onClose={() => setPasswordModalVisible(false)}
         onSubmit={handleSubmitPasswordChange}
+        isSubmitting={isSubmitting}
       />
       <AboutAppModal
         visible={isAboutAppModalVisible}
@@ -284,6 +340,7 @@ const AccountSettingsScreen: React.FC = () => {
         onClose={() => setNameModalVisible(false)}
         onSubmit={handleSubmitNameChange}
         currentName={userData?.username || ""}
+        isSubmitting={isSubmitting}
       />
     </View>
   );

@@ -29,13 +29,13 @@ export default function IpDeviceScreen() {
     ssid: "",
     password: "",
   });
-  // --- BARU ---
+
   const [isLoading, setIsLoading] = useState(false);
 
   const validateFields = () => {
     const newErrors = { ipAddress: "", ssid: "", password: "" };
     let isValid = true;
-    // --- Regex sederhana untuk validasi IP ---
+
     const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
 
     if (!ipAddress) {
@@ -61,7 +61,6 @@ export default function IpDeviceScreen() {
     return isValid;
   };
 
-  // --- LOGIKA UTAMA DIUBAH DI SINI ---
   const handleConnect = async () => {
     if (!validateFields()) {
       return;
@@ -125,7 +124,7 @@ export default function IpDeviceScreen() {
               placeholderTextColor={Colors.textLight}
               value={ipAddress}
               onChangeText={setIpAddress}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               autoCapitalize="none"
               onFocus={() => setFocusedInput("ip")}
               onBlur={() => setFocusedInput(null)}

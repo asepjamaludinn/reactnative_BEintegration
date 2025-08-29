@@ -5,16 +5,12 @@ import { useEffect } from "react";
 import { StatusBar, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/Colors";
-import { FanProvider } from "../context/FanContext";
-import { LampProvider } from "../context/LampContext";
-import "../global.css"; // Pastikan global.css diimpor
+import { DeviceProvider } from "../context/DeviceContext";
+import "../global.css";
 import { useLoadFonts } from "../hooks/useLoadFonts";
 
 SplashScreen.preventAutoHideAsync();
 
-/**
- * Header kustom yang menggunakan NativeWind untuk styling.
- */
 const Header = ({ options, navigation, route }: NativeStackHeaderProps) => {
   const insets = useSafeAreaInsets();
   const { title } = options;
@@ -25,7 +21,6 @@ const Header = ({ options, navigation, route }: NativeStackHeaderProps) => {
     route.name === "fan-control" ||
     route.name === "notifications";
 
-  // Logika untuk menentukan warna tetap sama
   let iconColor: string;
   let backgroundColor: string;
   let titleColor: string;
@@ -46,9 +41,7 @@ const Header = ({ options, navigation, route }: NativeStackHeaderProps) => {
 
   return (
     <View
-      // StyleSheet.headerContainer diubah menjadi className
       className="flex-row justify-between items-center px-5 pb-2.5 absolute top-0 left-0 right-0 z-10"
-      // Style dinamis tetap dipertahankan
       style={{
         paddingTop: insets.top,
         backgroundColor: backgroundColor,
@@ -83,7 +76,7 @@ const Header = ({ options, navigation, route }: NativeStackHeaderProps) => {
           <Ionicons name="notifications-outline" size={30} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity
-          className="ml-4" // marginLeft: 16 diubah menjadi ml-4
+          className="ml-4"
           onPress={() => navigation.navigate("account-settings" as never)}
         >
           <Ionicons name="person-circle-outline" size={30} color={iconColor} />
@@ -93,9 +86,6 @@ const Header = ({ options, navigation, route }: NativeStackHeaderProps) => {
   );
 };
 
-/**
- * Layout utama aplikasi.
- */
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useLoadFonts();
 
@@ -110,33 +100,31 @@ export default function RootLayout() {
   }
 
   return (
-    <FanProvider>
-      <LampProvider>
-        <StatusBar barStyle="light-content" />
-        <Stack
-          screenOptions={{
-            header: ({ options, navigation, route }) => (
-              <Header options={options} navigation={navigation} route={route} />
-            ),
-            headerShown: true,
+    <DeviceProvider>
+      <StatusBar barStyle="light-content" />
+      <Stack
+        screenOptions={{
+          header: ({ options, navigation, route }) => (
+            <Header options={options} navigation={navigation} route={route} />
+          ),
+          headerShown: true,
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(auth)"
+          options={{
+            headerShown: false,
+            animation: "fade",
+            animationDuration: 500,
           }}
-        >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="(auth)"
-            options={{
-              headerShown: false,
-              animation: "fade",
-              animationDuration: 500,
-            }}
-          />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="account-settings" options={{ title: "" }} />
-          <Stack.Screen name="lamp-control" options={{ title: "" }} />
-          <Stack.Screen name="fan-control" options={{ title: "" }} />
-          <Stack.Screen name="notifications" options={{ title: "" }} />
-        </Stack>
-      </LampProvider>
-    </FanProvider>
+        />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="account-settings" options={{ title: "" }} />
+        <Stack.Screen name="lamp-control" options={{ title: "" }} />
+        <Stack.Screen name="fan-control" options={{ title: "" }} />
+        <Stack.Screen name="notifications" options={{ title: "" }} />
+      </Stack>
+    </DeviceProvider>
   );
 }

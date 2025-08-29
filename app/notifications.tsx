@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -13,6 +14,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SwipeListView } from "react-native-swipe-list-view";
+import io, { Socket } from "socket.io-client";
 import { getProfile } from "../api/auth";
 import { deleteNotification, getNotifications } from "../api/notification";
 import { Colors } from "../constants/Colors";
@@ -23,6 +25,8 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:2000";
 
 type NotificationEntry = {
   id: string;
@@ -55,39 +59,83 @@ const notificationConfig = {
 };
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
+  const [allNotifications, setAllNotifications] = useState<NotificationEntry[]>(
+    []
+  );
+  const [isLoading, setLoading] = useState(true);
   const [userName, setUserName] = useState("User");
-  const [isLoading, setIsLoading] = useState(true);
+
   const router = useRouter();
 
-  const fetchData = useCallback(async () => {
-    const [notifResponse, profileResponse] = await Promise.all([
-      getNotifications(),
-      getProfile(),
-    ]);
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setLoading(true);
 
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      const profilePromise = getProfile();
+      const notificationsPromise = getNotifications();
 
-    if (notifResponse && notifResponse.data) {
-      setNotifications(notifResponse.data);
-    }
-    if (profileResponse && profileResponse.user) {
-      setUserName(profileResponse.user.username);
-    }
+      const [profileResponse, notificationsResponse] = await Promise.all([
+        profilePromise,
+        notificationsPromise,
+      ]);
 
-    setIsLoading(false);
+      if (profileResponse && profileResponse.user) {
+        setUserName(profileResponse.user.username);
+      }
+      if (notificationsResponse && notificationsResponse.data) {
+        setAllNotifications(notificationsResponse.data);
+      }
+      setLoading(false);
+    };
+
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let socket: Socket;
+
+    const connectSocket = async () => {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+
+      socket = io(API_URL, {
+        auth: { token },
+      });
+
+      socket.on("connect", () => {
+        console.log("Socket.IO connected on NotificationsScreen.");
+      });
+
+      socket.on("new_notification", (newNotification: NotificationEntry) => {
+        console.log("Received new_notification event:", newNotification);
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+        setAllNotifications((prevNotifications) => [
+          newNotification,
+          ...prevNotifications,
+        ]);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Socket.IO disconnected on NotificationsScreen.");
+      });
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, []);
 
   const handleDeleteNotification = async (notificationReadId: string) => {
     const response = await deleteNotification(notificationReadId);
     if (response) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setNotifications((prevLogs) =>
-        prevLogs.filter((log) => log.id !== notificationReadId)
+      setAllNotifications((prev) =>
+        prev.filter((item) => item.id !== notificationReadId)
       );
     }
   };
@@ -120,7 +168,9 @@ export default function NotificationsScreen() {
       >
         <View className="bg-white rounded-xl p-4 flex-row items-center mb-3 shadow shadow-black/5 border border-gray-100">
           <View
-            className={`w-12 h-12 rounded-full justify-center items-center mr-4 ${data.item.isRead ? "bg-gray-100" : "bg-primary/10"}`}
+            className={`w-12 h-12 rounded-full justify-center items-center mr-4 ${
+              data.item.isRead ? "bg-gray-100" : "bg-primary/10"
+            }`}
           >
             <Ionicons
               name={config.icon}
@@ -130,18 +180,24 @@ export default function NotificationsScreen() {
           </View>
           <View className="flex-1">
             <Text
-              className={`text-base leading-5 font-poppins-semibold ${data.item.isRead ? "text-textLight" : "text-text"}`}
+              className={`text-base leading-5 font-poppins-semibold ${
+                data.item.isRead ? "text-textLight" : "text-text"
+              }`}
             >
               {data.item.notification.title}
             </Text>
             <Text
-              className={`text-sm leading-5 font-roboto-regular mt-0.5 ${data.item.isRead ? "text-textLight" : "text-text"}`}
+              className={`text-sm leading-5 font-roboto-regular mt-0.5 ${
+                data.item.isRead ? "text-textLight" : "text-text"
+              }`}
               numberOfLines={2}
             >
               {data.item.notification.message}
             </Text>
             <Text
-              className={`text-xs mt-1.5 font-roboto-regular ${data.item.isRead ? "text-textLight/70" : "text-textLight"}`}
+              className={`text-xs mt-1.5 font-roboto-regular ${
+                data.item.isRead ? "text-textLight/70" : "text-textLight"
+              }`}
             >
               {formatSentAt(data.item.notification.sentAt)}
             </Text>
@@ -190,9 +246,9 @@ export default function NotificationsScreen() {
             color={Colors.primary}
             className="mt-16"
           />
-        ) : notifications.length > 0 ? (
+        ) : allNotifications.length > 0 ? (
           <SwipeListView
-            data={notifications}
+            data={allNotifications}
             renderItem={renderItem}
             renderHiddenItem={renderHiddenItem}
             keyExtractor={(item) => item.id}

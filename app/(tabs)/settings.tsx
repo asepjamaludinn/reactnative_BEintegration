@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Image,
   Keyboard,
@@ -15,24 +17,26 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SwipeListView } from "react-native-swipe-list-view";
+import {
+  addOrUpdateSchedule,
+  deleteSchedule,
+  getDeviceSettings,
+} from "../../api/device";
 import { Colors } from "../../constants/Colors";
-import { useFan } from "../../context/FanContext";
-import { useLamp } from "../../context/LampContext";
 
-interface ScheduleFormProps {
-  selectedDevice: "lamp" | "fan";
-  schedulesForDevice: Schedule[];
-  onSubmit: (data: Omit<Schedule, "id">) => void;
-}
-type Device = "lamp" | "fan";
+import { useDevices } from "../../context/DeviceContext";
+
+type DeviceType = "lamp" | "fan";
 type Schedule = { id: string; day: string; onTime: string; offTime: string };
 
-const initialSchedules: { lamp: Schedule[]; fan: Schedule[] } = {
-  lamp: [
-    { id: "l1", day: "Monday", onTime: "07:30", offTime: "17:30" },
-    { id: "l2", day: "Thursday", onTime: "12:30", offTime: "17:00" },
-  ],
-  fan: [{ id: "f1", day: "Saturday", onTime: "10:00", offTime: "18:00" }],
+const dayMap: { [key: string]: string } = {
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+  Sat: "Saturday",
+  Sun: "Sunday",
 };
 
 const daysOfWeek = [
@@ -59,12 +63,15 @@ const timeToMinutes = (timeStr: string) => {
   return hours * 60 + minutes;
 };
 
-// --- Schedule Form Component ---
 const ScheduleFormComponent = ({
   selectedDevice,
   schedulesForDevice,
   onSubmit,
-}: ScheduleFormProps) => {
+}: {
+  selectedDevice: DeviceType;
+  schedulesForDevice: Schedule[];
+  onSubmit: (data: Omit<Schedule, "id">) => void;
+}) => {
   const [isDayModalVisible, setDayModalVisible] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [inputOnTime, setInputOnTime] = useState("");
@@ -98,8 +105,20 @@ const ScheduleFormComponent = ({
     setError(null);
   }, []);
 
+  const proceedSubmit = () => {
+    if (!selectedDay || !inputOnTime || !inputOffTime) return;
+    onSubmit({
+      day: selectedDay,
+      onTime: inputOnTime,
+      offTime: inputOffTime,
+    });
+    clearForm();
+  };
+
   const handleLocalSubmit = () => {
     setError(null);
+    Keyboard.dismiss();
+
     if (isSubmitDisabled) {
       if (!selectedDay)
         return setError({ field: "day", message: "Please select a day." });
@@ -118,6 +137,7 @@ const ScheduleFormComponent = ({
         message: "Invalid time format. Please use HH:MM.",
       });
     }
+
     if (newEndTime <= newStartTime) {
       return setError({
         field: "submit",
@@ -125,26 +145,27 @@ const ScheduleFormComponent = ({
       });
     }
 
-    const schedulesForDay = schedulesForDevice.filter(
+    const isDayAlreadyScheduled = schedulesForDevice.some(
       (s) => s.day === selectedDay
     );
-    for (const schedule of schedulesForDay) {
-      const existingStartTime = timeToMinutes(schedule.onTime);
-      const existingEndTime = timeToMinutes(schedule.offTime);
-      if (newStartTime < existingEndTime && newEndTime > existingStartTime) {
-        return setError({
-          field: "submit",
-          message: "This schedule overlaps with an existing one.",
-        });
-      }
-    }
 
-    onSubmit({ day: selectedDay!, onTime: inputOnTime, offTime: inputOffTime });
-    clearForm();
+    if (isDayAlreadyScheduled) {
+      Alert.alert(
+        "Schedule Exists",
+        `A schedule for ${selectedDay} already exists. Do you want to overwrite it?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Overwrite", onPress: proceedSubmit },
+        ]
+      );
+    } else {
+      proceedSubmit();
+    }
   };
 
   return (
     <>
+      {/* ... SISA KODE JSX ANDA TETAP SAMA ... */}
       <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm shadow-black/5">
         <Text className="text-lg font-bold text-text mb-4">
           Set {selectedDevice === "lamp" ? "Lamp" : "Fan"} Schedule
@@ -255,7 +276,6 @@ const ScheduleFormComponent = ({
 };
 const ScheduleForm = React.memo(ScheduleFormComponent);
 
-// --- [TAMBAHKAN] Komponen Overlay untuk Mode Otomatis ---
 const AutoModeOverlay = () => (
   <View className="absolute inset-0 bg-gray-100/80 justify-center items-center rounded-2xl z-10 p-4">
     <Ionicons name="lock-closed" size={32} color={Colors.textLight} />
@@ -268,12 +288,15 @@ const AutoModeOverlay = () => (
   </View>
 );
 
-// --- MAIN COMPONENT ---
 export default function SettingsScreen() {
   const router = useRouter();
-  // ... (state yang sudah ada)
-  const [selectedDevice, setSelectedDevice] = useState<Device>("lamp");
-  const [schedules, setSchedules] = useState(initialSchedules);
+
+  const { devices, isLoading: isDevicesLoading } = useDevices();
+  const [selectedDeviceType, setSelectedDeviceType] =
+    useState<DeviceType>("lamp");
+  const [deviceSettings, setDeviceSettings] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [profileImage] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -283,15 +306,73 @@ export default function SettingsScreen() {
   const [editOffTime, setEditOffTime] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
 
-  // --- [TAMBAHKAN] Panggil hook konteks ---
-  const { isAutoMode: isFanAuto } = useFan();
-  const { isAutoMode: isLampAuto } = useLamp();
+  const activeDevice = devices.find(
+    (d) => d.deviceTypes[0] === selectedDeviceType
+  );
+  const isCurrentDeviceAuto = deviceSettings?.autoModeEnabled ?? false;
 
-  // --- [TAMBAHKAN] Helper untuk status auto mode perangkat saat ini ---
-  const isCurrentDeviceAuto =
-    selectedDevice === "lamp" ? isLampAuto : isFanAuto;
+  const fetchSettings = useCallback(async () => {
+    if (!activeDevice) {
+      setIsLoading(false);
+      setDeviceSettings(null);
+      return;
+    }
+    setIsLoading(true);
+    const settings = await getDeviceSettings(activeDevice.id);
+    if (settings) {
+      settings.schedules.sort(
+        (a: Schedule, b: Schedule) =>
+          daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day)
+      );
+      setDeviceSettings(settings);
+    } else {
+      setDeviceSettings(null);
+    }
+    setIsLoading(false);
+  }, [activeDevice]);
 
-  // ... (semua fungsi handler seperti handleDeviceChange, showSuccessMessage, dll tetap sama) ...
+  useEffect(() => {
+    if (!isDevicesLoading) {
+      fetchSettings();
+    }
+  }, [fetchSettings, isDevicesLoading]);
+
+  const showSuccessMessage = useCallback(
+    (msg: string) => {
+      setDeleteMessage(msg);
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1800),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setDeleteMessage(null));
+    },
+    [fadeAnim]
+  );
+
+  const handleApiAction = async (
+    action: Promise<any>,
+    successMessage: string
+  ) => {
+    const response = await action;
+    if (response) {
+      showSuccessMessage(successMessage);
+      fetchSettings();
+    }
+  };
+
+  const handleDeviceChange = useCallback((device: DeviceType) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedDeviceType(device);
+  }, []);
+
   const handleEditTimeChange = useCallback(
     (text: string, setter: (value: string) => void) => {
       setEditError(null);
@@ -314,66 +395,24 @@ export default function SettingsScreen() {
     setIsEditModalVisible(true);
   }, []);
 
-  const handleDeviceChange = useCallback((device: Device) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSelectedDevice(device);
-  }, []);
+  const handleSubmitNewSchedule = (newScheduleData: Omit<Schedule, "id">) => {
+    if (!activeDevice) return;
+    handleApiAction(
+      addOrUpdateSchedule(activeDevice.id, newScheduleData),
+      "Schedule saved successfully"
+    );
+  };
 
-  const showSuccessMessage = useCallback(
-    (msg: string) => {
-      setDeleteMessage(msg);
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1800),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => setDeleteMessage(null));
-    },
-    [fadeAnim]
-  );
+  const handleDelete = (dayToDelete: string) => {
+    if (!activeDevice) return;
 
-  const handleSubmitNewSchedule = useCallback(
-    (newScheduleData: Omit<Schedule, "id">) => {
-      const newSchedule: Schedule = {
-        id: `${selectedDevice}-${Date.now()}`,
-        ...newScheduleData,
-      };
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-      setSchedules((prevSchedules) => {
-        const updatedDeviceSchedules = [
-          ...prevSchedules[selectedDevice],
-          newSchedule,
-        ].sort((a, b) => daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day));
-        return { ...prevSchedules, [selectedDevice]: updatedDeviceSchedules };
-      });
-      showSuccessMessage("Schedule saved successfully");
-    },
-    [selectedDevice, showSuccessMessage]
-  );
-
-  const handleDelete = useCallback(
-    (idToDelete: string) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setSchedules((prevSchedules) => {
-        const updatedDeviceSchedules = prevSchedules[selectedDevice].filter(
-          (s) => s.id !== idToDelete
-        );
-        return { ...prevSchedules, [selectedDevice]: updatedDeviceSchedules };
-      });
-      showSuccessMessage("Schedule removed successfully");
-    },
-    [selectedDevice, showSuccessMessage]
-  );
-
+    handleApiAction(
+      deleteSchedule(activeDevice.id, dayToDelete),
+      "Schedule removed successfully"
+    );
+  };
   const handleUpdateSchedule = useCallback(() => {
-    if (!editingSchedule) return;
+    if (!editingSchedule || !activeDevice) return;
 
     setEditError(null);
 
@@ -387,11 +426,12 @@ export default function SettingsScreen() {
       return setEditError("Off time must be after on time.");
     }
 
-    const schedulesForDay = schedules[selectedDevice].filter(
-      (s) => s.day === editingSchedule.day && s.id !== editingSchedule.id
+    const otherSchedulesOnDay = (deviceSettings?.schedules || []).filter(
+      (s: Schedule) =>
+        s.day === editingSchedule.day && s.id !== editingSchedule.id
     );
 
-    for (const schedule of schedulesForDay) {
+    for (const schedule of otherSchedulesOnDay) {
       const existingStartTime = timeToMinutes(schedule.onTime);
       const existingEndTime = timeToMinutes(schedule.offTime);
       if (newStartTime < existingEndTime && newEndTime > existingStartTime) {
@@ -399,32 +439,37 @@ export default function SettingsScreen() {
       }
     }
 
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSchedules((prev) => ({
-      ...prev,
-      [selectedDevice]: prev[selectedDevice].map((s) =>
-        s.id === editingSchedule.id
-          ? { ...s, onTime: editOnTime, offTime: editOffTime }
-          : s
-      ),
-    }));
+    // [INTEGRASI] Panggil API untuk update
+    const updatedSchedule = {
+      ...editingSchedule,
+      onTime: editOnTime,
+      offTime: editOffTime,
+    };
+
+    handleApiAction(
+      addOrUpdateSchedule(activeDevice.id, updatedSchedule),
+      "Schedule updated successfully"
+    );
 
     setIsEditModalVisible(false);
     setEditingSchedule(null);
-    showSuccessMessage("Schedule updated successfully");
   }, [
     editingSchedule,
     editOnTime,
     editOffTime,
-    schedules,
-    selectedDevice,
+    deviceSettings,
+    activeDevice,
     showSuccessMessage,
   ]);
+
+  // --- Render Functions (Menggunakan UI dari kode Anda) ---
 
   const renderScheduleItem = ({ item }: { item: Schedule }) => (
     <View className="bg-white rounded-2xl p-4 mb-2.5 flex-row items-center justify-between shadow-sm shadow-black/5 border border-gray-100">
       <View className="flex-1">
-        <Text className="text-lg font-bold text-primary mb-2">{item.day}</Text>
+        <Text className="text-lg font-bold text-primary mb-2">
+          {dayMap[item.day] || item.day}
+        </Text>
         <View className="flex-row justify-between">
           <View className="flex-row items-center">
             <View className="w-2 h-2 rounded-full bg-greenDot mr-2" />
@@ -445,13 +490,11 @@ export default function SettingsScreen() {
       <TouchableOpacity
         onPress={() => handleStartEdit(item)}
         className="pl-4 p-1"
-        // --- [UBAH] Menonaktifkan tombol edit ---
         disabled={isCurrentDeviceAuto}
       >
         <Ionicons
           name="create-outline"
           size={20}
-          // --- [UBAH] Mengubah warna ikon jika nonaktif ---
           color={isCurrentDeviceAuto ? Colors.textLight : Colors.primary}
         />
       </TouchableOpacity>
@@ -464,9 +507,8 @@ export default function SettingsScreen() {
         className="items-center justify-center absolute top-0 bottom-0 w-[90px] right-0"
         onPress={() => {
           rowMap[data.item.id].closeRow();
-          handleDelete(data.item.id);
+          handleDelete(data.item.day);
         }}
-        // --- [UBAH] Menonaktifkan tombol hapus ---
         disabled={isCurrentDeviceAuto}
       >
         <Ionicons name="trash-outline" size={22} color={Colors.white} />
@@ -477,7 +519,7 @@ export default function SettingsScreen() {
   const renderListHeader = useCallback(
     () => (
       <>
-        {/* ... (bagian profile header tetap sama) ... */}
+        {/* Header Profil dari UI Anda */}
         <View className="items-center my-5">
           <Image
             source={
@@ -500,17 +542,20 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Tombol Toggle dari UI Anda */}
         <View className="flex-row bg-white/70 rounded-full p-0.5 mb-5">
-          {/* ... (bagian tombol Lamp/Fan tetap sama) ... */}
           <TouchableOpacity
             className={`flex-1 py-3 rounded-full ${
-              selectedDevice === "lamp" ? "bg-white shadow" : ""
+              selectedDeviceType === "lamp" ? "bg-white shadow" : ""
             }`}
             onPress={() => handleDeviceChange("lamp")}
           >
             <Text
               className={`text-center text-lg font-semibold ${
-                selectedDevice === "lamp" ? "text-primary" : "text-textLight"
+                selectedDeviceType === "lamp"
+                  ? "text-primary"
+                  : "text-textLight"
               }`}
             >
               Lamp
@@ -518,13 +563,13 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             className={`flex-1 py-3 rounded-full ${
-              selectedDevice === "fan" ? "bg-white shadow" : ""
+              selectedDeviceType === "fan" ? "bg-white shadow" : ""
             }`}
             onPress={() => handleDeviceChange("fan")}
           >
             <Text
               className={`text-center text-lg font-semibold ${
-                selectedDevice === "fan" ? "text-primary" : "text-textLight"
+                selectedDeviceType === "fan" ? "text-primary" : "text-textLight"
               }`}
             >
               Fan
@@ -532,11 +577,11 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* --- [UBAH] Membungkus form dan menambahkan overlay --- */}
+        {/* Form dengan Overlay Otomatis dari UI Anda */}
         <View>
           <ScheduleForm
-            selectedDevice={selectedDevice}
-            schedulesForDevice={schedules[selectedDevice]}
+            selectedDevice={selectedDeviceType}
+            schedulesForDevice={deviceSettings?.schedules || []}
             onSubmit={handleSubmitNewSchedule}
           />
           {isCurrentDeviceAuto && <AutoModeOverlay />}
@@ -551,45 +596,73 @@ export default function SettingsScreen() {
     ),
     [
       profileImage,
-      selectedDevice,
-      schedules,
-      router,
+      selectedDeviceType,
+      deviceSettings,
+      isCurrentDeviceAuto,
       handleDeviceChange,
       handleSubmitNewSchedule,
-      // --- [TAMBAHKAN] dependensi baru ---
-      isCurrentDeviceAuto,
     ]
   );
 
+  // --- JSX Utama ---
   return (
     <SafeAreaView
       className="flex-1 bg-secondary"
       edges={["top", "left", "right", "bottom"]}
     >
       <Pressable className="flex-1" onPress={Keyboard.dismiss}>
-        <SwipeListView
-          // ... (props lainnya)
-          style={{ flex: 1 }}
-          data={schedules[selectedDevice]}
-          renderItem={renderScheduleItem}
-          renderHiddenItem={renderHiddenItem}
-          rightOpenValue={-90}
-          // --- [UBAH] Menonaktifkan swipe jika mode auto aktif ---
-          disableRightSwipe={isCurrentDeviceAuto}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderListHeader}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: 150,
-            paddingTop: 50,
-          }}
-          keyboardShouldPersistTaps="always"
-          showsVerticalScrollIndicator={false}
-        />
+        {/* [INTEGRASI] Logika Loading dan Error */}
+        {isDevicesLoading || isLoading ? (
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : !activeDevice ? (
+          <View className="flex-1 justify-center items-center p-5">
+            <Ionicons name="sad-outline" size={60} color={Colors.textLight} />
+            <Text className="font-bold text-xl text-text mt-4 text-center">
+              Device Not Found
+            </Text>
+            <Text className="text-base text-textLight mt-1 text-center">
+              The '{selectedDeviceType}' is not available in your account.
+            </Text>
+          </View>
+        ) : (
+          <SwipeListView
+            style={{ flex: 1 }}
+            data={deviceSettings?.schedules || []}
+            renderItem={renderScheduleItem}
+            renderHiddenItem={renderHiddenItem}
+            rightOpenValue={-90}
+            disableRightSwipe={isCurrentDeviceAuto}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderListHeader}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingBottom: 150,
+              paddingTop: 50,
+            }}
+            keyboardShouldPersistTaps="always"
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={() => (
+              <View className="items-center justify-center py-10">
+                <Ionicons
+                  name="calendar-outline"
+                  size={40}
+                  color={Colors.textLight}
+                />
+                <Text className="font-medium text-base text-textLight mt-4">
+                  No schedules added yet.
+                </Text>
+                <Text className="text-sm text-textLight/70 mt-1">
+                  Use the form above to add one.
+                </Text>
+              </View>
+            )}
+          />
+        )}
       </Pressable>
 
-      {/* ... (Modal Edit dan Animated.View untuk pesan sukses tetap sama) ... */}
-      {/* Edit Schedule Modal */}
+      {/* Modal Edit dari UI Anda */}
       {editingSchedule && (
         <Modal
           animationType="fade"
@@ -607,7 +680,10 @@ export default function SettingsScreen() {
               </Text>
               <Text className="text-base text-center text-textLight mb-5">
                 Editing for{" "}
-                <Text className="font-bold">{editingSchedule.day}</Text>
+                <Text className="font-bold">
+                  {" "}
+                  {dayMap[editingSchedule.day] || editingSchedule.day}
+                </Text>
               </Text>
 
               <View>
@@ -638,7 +714,7 @@ export default function SettingsScreen() {
                   />
                   <Text className="text-lg text-text mx-2.5">Off Time</Text>
                   <TextInput
-                    className="flex-1 py-4 h-19text-base text-right"
+                    className="flex-1 py-4 h-19 text-base text-right"
                     style={{ lineHeight: 20 }}
                     placeholder="HH:MM"
                     keyboardType="numeric"
@@ -678,6 +754,7 @@ export default function SettingsScreen() {
         </Modal>
       )}
 
+      {/* Notifikasi Toast dari UI Anda */}
       {deleteMessage && (
         <Animated.View
           className="absolute bottom-32 self-center bg-black/80 py-3 px-5 rounded-full flex-row items-center z-50"

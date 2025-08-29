@@ -15,7 +15,6 @@ import Svg, { Circle, Path, Rect, SvgProps } from "react-native-svg";
 import { Colors } from "../../constants/Colors";
 import { TEAM_DATA } from "../../constants/team-data";
 
-// --- TYPE DEFINITIONS ---
 type Member = {
   id: string;
   name: string;
@@ -30,7 +29,6 @@ type Member = {
   };
 };
 
-// --- SOCIAL MEDIA ICONS ---
 const InstagramIcon = (props: SvgProps) => (
   <Svg
     width={28}
@@ -83,8 +81,6 @@ const GithubIcon = (props: SvgProps) => (
   </Svg>
 );
 
-// --- TEAM MEMBER CARD ---
-// The comment tail style is complex and best kept as a StyleSheet object
 const commentTailStyle = StyleSheet.create({
   tail: {
     width: 0,
@@ -150,7 +146,6 @@ const TeamMemberCard = ({
   );
 };
 
-// --- MAIN TEAMS SCREEN COMPONENT ---
 export default function TeamsScreen() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 

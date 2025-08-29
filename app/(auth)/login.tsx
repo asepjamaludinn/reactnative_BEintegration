@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 // --- PERUBAHAN ---
-import { login, storeUserSession } from "../../api/auth"; // Import dari file API
+import { login, storeUserSession } from "../../api/auth";
 import FullLogo from "../../assets/images/fulldmouv.svg";
 import { Colors } from "../../constants/Colors";
 
@@ -46,7 +46,6 @@ export default function LoginScreen() {
     }
   };
 
-  // --- LOGIKA UTAMA DIUBAH DI SINI ---
   const handleLogin = async () => {
     const emailError = validateEmail(email);
     const passwordError = validatePassword(password);
@@ -56,24 +55,19 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      // Memanggil fungsi login dari API service
       const response = await login(email, password);
 
-      // Backend akan merespon dengan null jika gagal, dan alert sudah ditampilkan
       if (response && response.token && response.user) {
         await storeUserSession(response.token, response.user.role);
         console.log(`Login successful as: ${response.user.role}`);
 
-        // Gunakan role dari backend, bukan hardcode email
         if (response.user.role === "SUPERUSER") {
-          router.replace("/(auth)/ip-device"); // superuser ke ip-device
+          router.replace("/(auth)/ip-device");
         } else {
-          router.replace("/(tabs)/home"); // user langsung ke home
+          router.replace("/(tabs)/home");
         }
       }
-      // Jika response null, tidak perlu melakukan apa-apa karena alert sudah muncul dari apiRequest
     } catch (error) {
-      // Catch ini untuk error yang tidak terduga di luar apiRequest
       console.error("Login failed unexpectedly:", error);
     } finally {
       setIsLoading(false);

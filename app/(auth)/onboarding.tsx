@@ -15,7 +15,6 @@ import OnboardingData from "../../constants/OnboardingData";
 
 const { width } = Dimensions.get("window");
 
-// Onboarding Item Component
 const OnboardingItem = ({ item }: { item: (typeof OnboardingData)[0] }) => {
   const SvgImage = item.image;
 
@@ -41,7 +40,6 @@ const OnboardingItem = ({ item }: { item: (typeof OnboardingData)[0] }) => {
   );
 };
 
-// Paginator Component
 const Paginator = ({
   data,
   scrollX,
@@ -88,7 +86,6 @@ const Paginator = ({
   );
 };
 
-// Main Screen Component
 export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const slidesRef = useRef<FlatList>(null);

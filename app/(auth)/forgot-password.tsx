@@ -68,7 +68,6 @@ export default function ForgotPasswordScreen() {
     return isValid;
   };
 
-  // --- LOGIKA UTAMA DIUBAH DI SINI ---
   const handleResetPassword = async () => {
     if (!validateFields()) {
       return;
