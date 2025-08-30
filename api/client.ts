@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 
-export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:2000";
+export const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const getAuthToken = async () => {
   try {
