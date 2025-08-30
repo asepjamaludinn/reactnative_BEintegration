@@ -12,10 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// --- PERUBAHAN ---
 import { login, storeUserSession } from "../../api/auth";
 import FullLogo from "../../assets/images/fulldmouv.svg";
 import { Colors } from "../../constants/Colors";
+import { useDevices } from "../../context/DeviceContext";
 
 const validateEmail = (email: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,7 +23,6 @@ const validateEmail = (email: string) => {
   if (!emailRegex.test(email)) return "Please enter a valid email address";
   return "";
 };
-
 const validatePassword = (password: string) => {
   if (!password) return "Fill this field";
   if (password.length < 8) return "Password must be at least 8 characters";
@@ -39,6 +38,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [errors, setErrors] = useState({ email: "", password: "" });
+
+  const { initializeSession } = useDevices();
 
   const clearErrorsOnChange = () => {
     if (errors.email || errors.password) {
@@ -61,6 +62,9 @@ export default function LoginScreen() {
         await storeUserSession(response.token, response.user.role);
         console.log(`Login successful as: ${response.user.role}`);
 
+        // --- [PERBAIKAN] Panggil inisialisasi SEBELUM navigasi ---
+        await initializeSession();
+
         if (response.user.role === "SUPERUSER") {
           router.replace("/(auth)/ip-device");
         } else {
@@ -75,6 +79,7 @@ export default function LoginScreen() {
   };
 
   return (
+    // ... SISA KODE JSX TETAP SAMA
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}

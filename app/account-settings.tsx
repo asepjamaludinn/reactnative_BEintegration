@@ -65,8 +65,7 @@ const AccountSettingsScreen: React.FC = () => {
       {
         text: "Yes",
         onPress: async () => {
-          const role = await AsyncStorage.getItem("userRole");
-          if (role === "SUPERUSER") {
+          if (userData?.role === "SUPERUSER") {
             await AsyncStorage.setItem("justLoggedOut", "true");
           }
           await AsyncStorage.multiRemove(["userToken", "userRole"]);
@@ -194,12 +193,9 @@ const AccountSettingsScreen: React.FC = () => {
         <View className="w-full">
           {/* Email */}
           <View className="flex-row items-center py-4 border-b border-border">
-            <Ionicons
-              name="mail-outline"
-              size={26}
-              color={Colors.primary}
-              className="mr-5"
-            />
+            <View className="mr-5">
+              <Ionicons name="mail-outline" size={26} color={Colors.primary} />
+            </View>
             <View>
               <Text className="text-lg font-poppins-semibold text-text">
                 Email
@@ -215,12 +211,13 @@ const AccountSettingsScreen: React.FC = () => {
             className="flex-row items-center py-4 border-b border-border"
             onPress={() => setNameModalVisible(true)}
           >
-            <Ionicons
-              name="person-outline"
-              size={26}
-              color={Colors.primary}
-              className="mr-5"
-            />
+            <View className="mr-5">
+              <Ionicons
+                name="person-outline"
+                size={26}
+                color={Colors.primary}
+              />
+            </View>
             <View className="flex-1">
               <Text className="text-lg font-poppins-semibold text-text">
                 Name
@@ -241,12 +238,9 @@ const AccountSettingsScreen: React.FC = () => {
             className="flex-row items-center py-4 border-b border-border"
             onPress={() => setPasswordModalVisible(true)}
           >
-            <Ionicons
-              name="key-outline"
-              size={26}
-              color={Colors.primary}
-              className="mr-5"
-            />
+            <View className="mr-5">
+              <Ionicons name="key-outline" size={26} color={Colors.primary} />
+            </View>
             <View className="flex-1">
               <Text className="text-lg font-poppins-semibold text-text">
                 Password
@@ -262,18 +256,19 @@ const AccountSettingsScreen: React.FC = () => {
             />
           </TouchableOpacity>
 
-          {/* Add Account (Conditional) */}
           {userData?.role === "SUPERUSER" && (
             <TouchableOpacity
               className="flex-row items-center py-4 border-b border-border"
               onPress={() => router.push("/adduser")}
             >
-              <Ionicons
-                name="person-add-outline"
-                size={26}
-                color={Colors.primary}
-                className="mr-5"
-              />
+              {/* [DIPERBAIKI] Ionicons tidak mendukung className, jadi dibungkus View untuk styling */}
+              <View className="mr-5">
+                <Ionicons
+                  name="person-add-outline"
+                  size={26}
+                  color={Colors.primary}
+                />
+              </View>
               <View className="flex-1">
                 <Text className="text-lg font-poppins-semibold text-text">
                   Add Account
@@ -295,12 +290,13 @@ const AccountSettingsScreen: React.FC = () => {
             className="flex-row items-center py-4 border-b border-border"
             onPress={() => setAboutAppModalVisible(true)}
           >
-            <Ionicons
-              name="information-circle-outline"
-              size={26}
-              color={Colors.primary}
-              className="mr-5"
-            />
+            <View className="mr-5">
+              <Ionicons
+                name="information-circle-outline"
+                size={26}
+                color={Colors.primary}
+              />
+            </View>
             <View className="flex-1">
               <Text className="text-lg font-poppins-semibold text-text">
                 About App

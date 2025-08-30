@@ -1,6 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -24,6 +26,7 @@ interface DeviceContextType {
   devices: Device[];
   isLoading: boolean;
   getDeviceById: (deviceId: string) => Device | undefined;
+  initializeSession: () => Promise<void>;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -32,79 +35,82 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      const response = await DeviceApi.getDevices();
-      if (response && response.devices) {
-        setDevices(response.devices);
-      }
-      setIsLoading(false);
-    };
+  const initializeSession = useCallback(async () => {
+    setIsLoading(true);
 
-    const setupSocketListeners = async () => {
-      let socket = getSocket();
-      if (!socket) {
-        socket = await initializeSocket();
-      }
+    const response = await DeviceApi.getDevices();
+    if (response && response.devices) {
+      setDevices(response.devices);
+    }
 
-      if (socket) {
-        socket.off("devices_updated");
-        socket.off("device_added");
-        socket.off("settings_updated");
-        socket.off("device_operational_status_updated");
+    let socket = getSocket();
+    if (!socket) {
+      socket = await initializeSocket();
+    }
 
-        socket.on("devices_updated", (updatedDevices: Device[]) => {
-          console.log("Received devices_updated event");
-          setDevices((prevDevices) => {
-            const updatedDevicesMap = new Map(
-              updatedDevices.map((d) => [d.id, d])
-            );
-            return prevDevices.map(
-              (device) => updatedDevicesMap.get(device.id) || device
-            );
-          });
-        });
+    if (socket) {
+      socket.off("devices_updated");
+      socket.off("device_added");
+      socket.off("settings_updated");
+      socket.off("device_operational_status_updated");
 
-        socket.on("device_added", (newDevice: Device) => {
-          console.log("Received device_added event");
-          setDevices((prev) => [...prev, newDevice]);
-        });
-
-        socket.on("settings_updated", (updatedSettings: any) => {
-          console.log("Received settings_updated event");
-          setDevices((prevDevices) =>
-            prevDevices.map((device) =>
-              device.id === updatedSettings.deviceId
-                ? { ...device, setting: updatedSettings }
-                : device
-            )
+      socket.on("devices_updated", (updatedDevices: Device[]) => {
+        setDevices((prevDevices) => {
+          const updatedDevicesMap = new Map(
+            updatedDevices.map((d) => [d.id, d])
+          );
+          return prevDevices.map(
+            (device) => updatedDevicesMap.get(device.id) || device
           );
         });
+      });
+      socket.on("device_added", (newDevice: Device) => {
+        setDevices((prev) => [...prev, newDevice]);
+      });
+      socket.on("settings_updated", (updatedSettings: any) => {
+        setDevices((prevDevices) =>
+          prevDevices.map((device) =>
+            device.id === updatedSettings.deviceId
+              ? { ...device, setting: updatedSettings }
+              : device
+          )
+        );
+      });
+      socket.on("device_operational_status_updated", (data: any) => {
+        setDevices((prevDevices) =>
+          prevDevices.map((device) =>
+            device.id === data.deviceId
+              ? { ...device, operationalStatus: data.operationalStatus }
+              : device
+          )
+        );
+      });
+    }
 
-        socket.on("device_operational_status_updated", (data: any) => {
-          console.log("Received device_operational_status_updated event");
-          setDevices((prevDevices) =>
-            prevDevices.map((device) =>
-              device.id === data.deviceId
-                ? { ...device, operationalStatus: data.operationalStatus }
-                : device
-            )
-          );
-        });
-      }
-    };
-
-    fetchInitialData();
-    setupSocketListeners();
+    setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    const checkForExistingSession = async () => {
+      const token = await AsyncStorage.getItem("userToken");
+      if (token) {
+        initializeSession();
+      } else {
+        setIsLoading(false);
+      }
+    };
+
+    checkForExistingSession();
+  }, [initializeSession]);
 
   const getDeviceById = (deviceId: string) => {
     return devices.find((d) => d.id === deviceId);
   };
 
   return (
-    <DeviceContext.Provider value={{ devices, isLoading, getDeviceById }}>
+    <DeviceContext.Provider
+      value={{ devices, isLoading, getDeviceById, initializeSession }}
+    >
       {children}
     </DeviceContext.Provider>
   );

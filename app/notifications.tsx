@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -14,10 +13,10 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SwipeListView } from "react-native-swipe-list-view";
-import io, { Socket } from "socket.io-client";
 import { getProfile } from "../api/auth";
 import { deleteNotification, getNotifications } from "../api/notification";
 import { Colors } from "../constants/Colors";
+import { getSocket, initializeSocket } from "../utils/socket";
 
 if (
   Platform.OS === "android" &&
@@ -25,8 +24,6 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:2000";
 
 type NotificationEntry = {
   id: string;
@@ -64,13 +61,11 @@ export default function NotificationsScreen() {
   );
   const [isLoading, setLoading] = useState(true);
   const [userName, setUserName] = useState("User");
-
   const router = useRouter();
 
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
-
       const profilePromise = getProfile();
       const notificationsPromise = getNotifications();
 
@@ -92,41 +87,30 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => {
-    let socket: Socket;
+    const setupSocketListener = async () => {
+      let socket = getSocket();
+      if (!socket) {
+        socket = await initializeSocket();
+      }
 
-    const connectSocket = async () => {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) return;
-
-      socket = io(API_URL, {
-        auth: { token },
-      });
-
-      socket.on("connect", () => {
-        console.log("Socket.IO connected on NotificationsScreen.");
-      });
-
-      socket.on("new_notification", (newNotification: NotificationEntry) => {
-        console.log("Received new_notification event:", newNotification);
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-        setAllNotifications((prevNotifications) => [
-          newNotification,
-          ...prevNotifications,
-        ]);
-      });
-
-      socket.on("disconnect", () => {
-        console.log("Socket.IO disconnected on NotificationsScreen.");
-      });
+      if (socket) {
+        socket.off("new_notification");
+        socket.on("new_notification", (newNotification: NotificationEntry) => {
+          console.log("Received new_notification event:", newNotification);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setAllNotifications((prevNotifications) => [
+            newNotification,
+            ...prevNotifications,
+          ]);
+        });
+      }
     };
 
-    connectSocket();
+    setupSocketListener();
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      const socket = getSocket();
+      socket?.off("new_notification");
     };
   }, []);
 

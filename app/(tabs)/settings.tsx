@@ -17,14 +17,40 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SwipeListView } from "react-native-swipe-list-view";
+import { getProfile, UserRole } from "../../api/auth";
 import {
   addOrUpdateSchedule,
   deleteSchedule,
   getDeviceSettings,
 } from "../../api/device";
 import { Colors } from "../../constants/Colors";
-
 import { useDevices } from "../../context/DeviceContext";
+
+const timeToMinutes = (time: string): number => {
+  if (!time || !time.includes(":")) {
+    return NaN;
+  }
+  const [hours, minutes] = time.split(":").map(Number);
+  if (
+    isNaN(hours) ||
+    isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return NaN;
+  }
+  return hours * 60 + minutes;
+};
+
+type UserData = {
+  id: string;
+  username: string;
+  email: string;
+  profilePict: string | null;
+  role: UserRole;
+};
 
 type DeviceType = "lamp" | "fan";
 type Schedule = { id: string; day: string; onTime: string; offTime: string };
@@ -49,28 +75,16 @@ const daysOfWeek = [
   "Sunday",
 ];
 
-const timeToMinutes = (timeStr: string) => {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  if (
-    isNaN(hours) ||
-    isNaN(minutes) ||
-    hours < 0 ||
-    hours > 23 ||
-    minutes < 0 ||
-    minutes > 59
-  )
-    return NaN;
-  return hours * 60 + minutes;
-};
-
 const ScheduleFormComponent = ({
   selectedDevice,
   schedulesForDevice,
   onSubmit,
+  userRole,
 }: {
   selectedDevice: DeviceType;
   schedulesForDevice: Schedule[];
   onSubmit: (data: Omit<Schedule, "id">) => void;
+  userRole: UserRole | undefined;
 }) => {
   const [isDayModalVisible, setDayModalVisible] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -116,6 +130,14 @@ const ScheduleFormComponent = ({
   };
 
   const handleLocalSubmit = () => {
+    if (userRole !== "SUPERUSER") {
+      Alert.alert(
+        "Permission Denied",
+        "Only a Super User can create a new schedule."
+      );
+      return;
+    }
+
     setError(null);
     Keyboard.dismiss();
 
@@ -146,7 +168,7 @@ const ScheduleFormComponent = ({
     }
 
     const isDayAlreadyScheduled = schedulesForDevice.some(
-      (s) => s.day === selectedDay
+      (s) => dayMap[s.day] === selectedDay
     );
 
     if (isDayAlreadyScheduled) {
@@ -165,7 +187,6 @@ const ScheduleFormComponent = ({
 
   return (
     <>
-      {/* ... SISA KODE JSX ANDA TETAP SAMA ... */}
       <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm shadow-black/5">
         <Text className="text-lg font-bold text-text mb-4">
           Set {selectedDevice === "lamp" ? "Lamp" : "Fan"} Schedule
@@ -193,8 +214,7 @@ const ScheduleFormComponent = ({
             <Ionicons name="time-outline" size={20} color={Colors.textLight} />
             <Text className="text-lg text-text mx-2.5">On Time</Text>
             <TextInput
-              className="flex-1 py-4 h-18 text-base text-right"
-              style={{ lineHeight: 20 }}
+              className="flex-1 py-4 text-base text-right"
               placeholder="HH:MM"
               keyboardType="numeric"
               maxLength={5}
@@ -208,8 +228,7 @@ const ScheduleFormComponent = ({
             <Ionicons name="time-outline" size={20} color={Colors.textLight} />
             <Text className="text-lg text-text mx-2.5">Off Time</Text>
             <TextInput
-              className="flex-1 py-4 h-18 text-base text-right"
-              style={{ lineHeight: 20 }}
+              className="flex-1 py-4 text-base text-right"
               placeholder="HH:MM"
               keyboardType="numeric"
               maxLength={5}
@@ -290,14 +309,12 @@ const AutoModeOverlay = () => (
 
 export default function SettingsScreen() {
   const router = useRouter();
-
   const { devices, isLoading: isDevicesLoading } = useDevices();
   const [selectedDeviceType, setSelectedDeviceType] =
     useState<DeviceType>("lamp");
   const [deviceSettings, setDeviceSettings] = useState<any>(null);
+  const [profileData, setProfileData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const [profileImage] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const fadeAnim = useState(new Animated.Value(0))[0];
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -311,31 +328,41 @@ export default function SettingsScreen() {
   );
   const isCurrentDeviceAuto = deviceSettings?.autoModeEnabled ?? false;
 
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      const profileResponse = await getProfile();
+      if (profileResponse && profileResponse.user) {
+        setProfileData(profileResponse.user);
+      }
+      setIsLoading(false);
+    };
+
+    fetchInitialData();
+  }, []);
+
   const fetchSettings = useCallback(async () => {
     if (!activeDevice) {
-      setIsLoading(false);
       setDeviceSettings(null);
       return;
     }
-    setIsLoading(true);
     const settings = await getDeviceSettings(activeDevice.id);
     if (settings) {
       settings.schedules.sort(
         (a: Schedule, b: Schedule) =>
-          daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day)
+          daysOfWeek.indexOf(dayMap[a.day]) - daysOfWeek.indexOf(dayMap[b.day])
       );
       setDeviceSettings(settings);
     } else {
       setDeviceSettings(null);
     }
-    setIsLoading(false);
   }, [activeDevice]);
 
   useEffect(() => {
     if (!isDevicesLoading) {
       fetchSettings();
     }
-  }, [fetchSettings, isDevicesLoading]);
+  }, [isDevicesLoading, fetchSettings]);
 
   const showSuccessMessage = useCallback(
     (msg: string) => {
@@ -387,13 +414,23 @@ export default function SettingsScreen() {
     []
   );
 
-  const handleStartEdit = useCallback((schedule: Schedule) => {
-    setEditingSchedule(schedule);
-    setEditOnTime(schedule.onTime);
-    setEditOffTime(schedule.offTime);
-    setEditError(null);
-    setIsEditModalVisible(true);
-  }, []);
+  const handleStartEdit = useCallback(
+    (schedule: Schedule) => {
+      if (profileData?.role !== "SUPERUSER") {
+        Alert.alert(
+          "Permission Denied",
+          "Only a Super User can edit schedules."
+        );
+        return;
+      }
+      setEditingSchedule(schedule);
+      setEditOnTime(schedule.onTime);
+      setEditOffTime(schedule.offTime);
+      setEditError(null);
+      setIsEditModalVisible(true);
+    },
+    [profileData]
+  );
 
   const handleSubmitNewSchedule = (newScheduleData: Omit<Schedule, "id">) => {
     if (!activeDevice) return;
@@ -411,7 +448,16 @@ export default function SettingsScreen() {
       "Schedule removed successfully"
     );
   };
+
   const handleUpdateSchedule = useCallback(() => {
+    if (profileData?.role !== "SUPERUSER") {
+      Alert.alert(
+        "Permission Denied",
+        "Only a Super User can update schedules."
+      );
+      return;
+    }
+
     if (!editingSchedule || !activeDevice) return;
 
     setEditError(null);
@@ -426,20 +472,6 @@ export default function SettingsScreen() {
       return setEditError("Off time must be after on time.");
     }
 
-    const otherSchedulesOnDay = (deviceSettings?.schedules || []).filter(
-      (s: Schedule) =>
-        s.day === editingSchedule.day && s.id !== editingSchedule.id
-    );
-
-    for (const schedule of otherSchedulesOnDay) {
-      const existingStartTime = timeToMinutes(schedule.onTime);
-      const existingEndTime = timeToMinutes(schedule.offTime);
-      if (newStartTime < existingEndTime && newEndTime > existingStartTime) {
-        return setEditError("This schedule overlaps with an existing one.");
-      }
-    }
-
-    // [INTEGRASI] Panggil API untuk update
     const updatedSchedule = {
       ...editingSchedule,
       onTime: editOnTime,
@@ -457,12 +489,10 @@ export default function SettingsScreen() {
     editingSchedule,
     editOnTime,
     editOffTime,
-    deviceSettings,
     activeDevice,
-    showSuccessMessage,
+    handleApiAction,
+    profileData,
   ]);
-
-  // --- Render Functions (Menggunakan UI dari kode Anda) ---
 
   const renderScheduleItem = ({ item }: { item: Schedule }) => (
     <View className="bg-white rounded-2xl p-4 mb-2.5 flex-row items-center justify-between shadow-sm shadow-black/5 border border-gray-100">
@@ -506,8 +536,16 @@ export default function SettingsScreen() {
       <TouchableOpacity
         className="items-center justify-center absolute top-0 bottom-0 w-[90px] right-0"
         onPress={() => {
+          if (profileData?.role !== "SUPERUSER") {
+            Alert.alert(
+              "Permission Denied",
+              "Only a Super User can delete schedules."
+            );
+            rowMap[data.item.id].closeRow();
+            return;
+          }
           rowMap[data.item.id].closeRow();
-          handleDelete(data.item.day);
+          handleDelete(dayMap[data.item.day] || data.item.day);
         }}
         disabled={isCurrentDeviceAuto}
       >
@@ -519,19 +557,20 @@ export default function SettingsScreen() {
   const renderListHeader = useCallback(
     () => (
       <>
-        {/* Header Profil dari UI Anda */}
         <View className="items-center my-5">
           <Image
             source={
-              profileImage
-                ? { uri: profileImage }
+              profileData?.profilePict
+                ? { uri: profileData.profilePict }
                 : require("../../assets/images/pp.svg")
             }
             className="w-36 h-36 rounded-full border-4 border-white"
           />
-          <Text className="text-xl font-bold text-text mt-3">TimRisetCPS</Text>
+          <Text className="text-xl font-bold text-text mt-3">
+            {profileData?.username || "User"}
+          </Text>
           <Text className="text-base text-textLight">
-            TimRisetCPS@gmail.com
+            {profileData?.email || "email@example.com"}
           </Text>
           <TouchableOpacity
             className="mt-4 bg-white/80 py-2 px-5 rounded-full"
@@ -543,7 +582,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Tombol Toggle dari UI Anda */}
         <View className="flex-row bg-white/70 rounded-full p-0.5 mb-5">
           <TouchableOpacity
             className={`flex-1 py-3 rounded-full ${
@@ -577,12 +615,12 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Form dengan Overlay Otomatis dari UI Anda */}
         <View>
           <ScheduleForm
             selectedDevice={selectedDeviceType}
             schedulesForDevice={deviceSettings?.schedules || []}
             onSubmit={handleSubmitNewSchedule}
+            userRole={profileData?.role}
           />
           {isCurrentDeviceAuto && <AutoModeOverlay />}
         </View>
@@ -595,7 +633,7 @@ export default function SettingsScreen() {
       </>
     ),
     [
-      profileImage,
+      profileData,
       selectedDeviceType,
       deviceSettings,
       isCurrentDeviceAuto,
@@ -604,14 +642,12 @@ export default function SettingsScreen() {
     ]
   );
 
-  // --- JSX Utama ---
   return (
     <SafeAreaView
       className="flex-1 bg-secondary"
-      edges={["top", "left", "right", "bottom"]}
+      edges={["top", "left", "right"]}
     >
       <Pressable className="flex-1" onPress={Keyboard.dismiss}>
-        {/* [INTEGRASI] Logika Loading dan Error */}
         {isDevicesLoading || isLoading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="large" color={Colors.primary} />
@@ -639,7 +675,6 @@ export default function SettingsScreen() {
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingBottom: 150,
-              paddingTop: 50,
             }}
             keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
@@ -661,8 +696,6 @@ export default function SettingsScreen() {
           />
         )}
       </Pressable>
-
-      {/* Modal Edit dari UI Anda */}
       {editingSchedule && (
         <Modal
           animationType="fade"
@@ -681,11 +714,9 @@ export default function SettingsScreen() {
               <Text className="text-base text-center text-textLight mb-5">
                 Editing for{" "}
                 <Text className="font-bold">
-                  {" "}
                   {dayMap[editingSchedule.day] || editingSchedule.day}
                 </Text>
               </Text>
-
               <View>
                 <View className="flex-row items-center bg-background rounded-xl px-4 mb-2.5">
                   <Ionicons
@@ -695,8 +726,7 @@ export default function SettingsScreen() {
                   />
                   <Text className="text-lg text-text mx-2.5">On Time</Text>
                   <TextInput
-                    className="flex-1 py-4 h-19 text-base text-right"
-                    style={{ lineHeight: 20 }}
+                    className="flex-1 py-4 text-base text-right"
                     placeholder="HH:MM"
                     keyboardType="numeric"
                     maxLength={5}
@@ -714,8 +744,7 @@ export default function SettingsScreen() {
                   />
                   <Text className="text-lg text-text mx-2.5">Off Time</Text>
                   <TextInput
-                    className="flex-1 py-4 h-19 text-base text-right"
-                    style={{ lineHeight: 20 }}
+                    className="flex-1 py-4 text-base text-right"
                     placeholder="HH:MM"
                     keyboardType="numeric"
                     maxLength={5}
@@ -726,13 +755,11 @@ export default function SettingsScreen() {
                   />
                 </View>
               </View>
-
               {editError && (
                 <Text className="text-redDot text-sm text-center mt-4 font-medium">
                   {editError}
                 </Text>
               )}
-
               <TouchableOpacity
                 className="bg-primary rounded-2xl py-4 items-center mt-5"
                 onPress={handleUpdateSchedule}
@@ -753,8 +780,6 @@ export default function SettingsScreen() {
           </Pressable>
         </Modal>
       )}
-
-      {/* Notifikasi Toast dari UI Anda */}
       {deleteMessage && (
         <Animated.View
           className="absolute bottom-32 self-center bg-black/80 py-3 px-5 rounded-full flex-row items-center z-50"
