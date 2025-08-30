@@ -8,17 +8,8 @@ export const login = async (email: string, password: string) => {
   return apiRequest("/auth/login", "POST", { email, password }, false);
 };
 
-export const onboardDevice = async (
-  ip_address: string,
-  wifi_ssid: string,
-  wifi_password: string
-) => {
-  return apiRequest(
-    "/device/onboarding",
-    "POST",
-    { ip_address, wifi_ssid, wifi_password },
-    true
-  );
+export const onboardDevice = async (data: { uniqueId: string }) => {
+  return apiRequest("/device/onboarding", "POST", data, true);
 };
 
 export const resetPassword = async (email: string, newPassword: string) => {
