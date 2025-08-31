@@ -261,7 +261,6 @@ const AccountSettingsScreen: React.FC = () => {
               className="flex-row items-center py-4 border-b border-border"
               onPress={() => router.push("/adduser")}
             >
-              {/* [DIPERBAIKI] Ionicons tidak mendukung className, jadi dibungkus View untuk styling */}
               <View className="mr-5">
                 <Ionicons
                   name="person-add-outline"

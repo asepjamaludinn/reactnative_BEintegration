@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -16,6 +16,7 @@ import { SwipeListView } from "react-native-swipe-list-view";
 import { getProfile } from "../api/auth";
 import { deleteNotification, getNotifications } from "../api/notification";
 import { Colors } from "../constants/Colors";
+import { useNotifications } from "../context/NotificationContext";
 import { getSocket, initializeSocket } from "../utils/socket";
 
 if (
@@ -25,19 +26,16 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Tipe data yang digunakan oleh state dan UI komponen
 type NotificationEntry = {
-  id: string; // Ini adalah ID dari NotificationRead
+  id: string;
   isRead: boolean;
   notification: {
-    id: string; // Ini adalah ID dari Notification
+    id: string;
     title: string;
     message: string;
     sentAt: string;
     type: "motion_detected" | "device_status_change" | "scheduled_reminder";
-    device: {
-      deviceName: string;
-    };
+    device: { deviceName: string };
   };
 };
 
@@ -47,24 +45,16 @@ type RawNotificationPayload = {
   message: string;
   sentAt: string;
   type: "motion_detected" | "device_status_change" | "scheduled_reminder";
-  device: {
-    deviceName: string;
-  };
+  device: { deviceName: string };
 };
 
 const notificationConfig = {
-  motion_detected: {
-    icon: "walk-outline" as const,
-    filterType: "motion",
-  },
+  motion_detected: { icon: "walk-outline" as const, filterType: "motion" },
   device_status_change: {
     icon: "toggle-outline" as const,
     filterType: "automatic",
   },
-  scheduled_reminder: {
-    icon: "time-outline" as const,
-    filterType: "schedule",
-  },
+  scheduled_reminder: { icon: "time-outline" as const, filterType: "schedule" },
 };
 
 export default function NotificationsScreen() {
@@ -74,6 +64,17 @@ export default function NotificationsScreen() {
   const [isLoading, setLoading] = useState(true);
   const [userName, setUserName] = useState("User");
   const router = useRouter();
+
+  const { unreadCount, markAllAsRead } = useNotifications();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (unreadCount > 0) {
+        console.log("Notification screen focused, marking all as read.");
+        markAllAsRead();
+      }
+    }, [unreadCount, markAllAsRead])
+  );
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -107,10 +108,8 @@ export default function NotificationsScreen() {
 
       if (socket) {
         socket.off("new_notification");
-
         socket.on("new_notification", (payload: RawNotificationPayload) => {
           console.log("Received new_notification event:", payload);
-
           const formattedNotification: NotificationEntry = {
             id: `${payload.id}-${Date.now()}`,
             isRead: false,
@@ -123,18 +122,13 @@ export default function NotificationsScreen() {
               device: payload.device,
             },
           };
-
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setAllNotifications((prevNotifications) => [
-            formattedNotification,
-            ...prevNotifications,
-          ]);
+          setAllNotifications((prev) => [formattedNotification, ...prev]);
         });
       }
     };
 
     setupSocketListener();
-
     return () => {
       const socket = getSocket();
       socket?.off("new_notification");
@@ -150,7 +144,6 @@ export default function NotificationsScreen() {
       );
     }
   };
-
   const handleNotificationPress = (notification: NotificationEntry) => {
     const config = notificationConfig[notification.notification.type];
     router.push({
@@ -158,7 +151,6 @@ export default function NotificationsScreen() {
       params: { filter: config.filterType },
     });
   };
-
   const formatSentAt = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString("en-GB", {
@@ -169,7 +161,6 @@ export default function NotificationsScreen() {
       minute: "2-digit",
     });
   };
-
   const renderItem = (data: { item: NotificationEntry }) => {
     const config = notificationConfig[data.item.notification.type];
     return (
@@ -217,7 +208,6 @@ export default function NotificationsScreen() {
       </TouchableOpacity>
     );
   };
-
   const renderHiddenItem = (data: { item: NotificationEntry }) => (
     <View className="items-center flex-1 flex-row justify-end mb-3">
       <TouchableOpacity
@@ -228,7 +218,6 @@ export default function NotificationsScreen() {
       </TouchableOpacity>
     </View>
   );
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView

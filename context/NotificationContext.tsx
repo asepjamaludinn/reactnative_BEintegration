@@ -33,17 +33,16 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const markAllAsRead = useCallback(async () => {
     const response = await NotificationApi.markAllAsRead();
     if (response) {
-      setUnreadCount(0); // Reset count after marking all as read
+      setUnreadCount(0);
     }
   }, []);
 
   useEffect(() => {
     const setupSocketListener = async () => {
-      // Pastikan ada token sebelum mencoba fetch atau konek socket
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
 
-      fetchUnreadCount(); // Fetch initial count
+      fetchUnreadCount();
 
       let socket = getSocket();
       if (!socket) {

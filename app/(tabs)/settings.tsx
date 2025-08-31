@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -328,18 +328,20 @@ export default function SettingsScreen() {
   );
   const isCurrentDeviceAuto = deviceSettings?.autoModeEnabled ?? false;
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      const profileResponse = await getProfile();
-      if (profileResponse && profileResponse.user) {
-        setProfileData(profileResponse.user);
-      }
-      setIsLoading(false);
-    };
+  useFocusEffect(
+    useCallback(() => {
+      const fetchInitialData = async () => {
+        setIsLoading(true);
+        const profileResponse = await getProfile();
+        if (profileResponse && profileResponse.user) {
+          setProfileData(profileResponse.user);
+        }
+        setIsLoading(false);
+      };
 
-    fetchInitialData();
-  }, []);
+      fetchInitialData();
+    }, [])
+  );
 
   const fetchSettings = useCallback(async () => {
     if (!activeDevice) {
@@ -362,7 +364,7 @@ export default function SettingsScreen() {
     if (!isDevicesLoading) {
       fetchSettings();
     }
-  }, [isDevicesLoading, fetchSettings]);
+  }, [isDevicesLoading, fetchSettings, selectedDeviceType]);
 
   const showSuccessMessage = useCallback(
     (msg: string) => {
@@ -658,8 +660,11 @@ export default function SettingsScreen() {
             <Text className="font-bold text-xl text-text mt-4 text-center">
               Device Not Found
             </Text>
+
             <Text className="text-base text-textLight mt-1 text-center">
-              The '{selectedDeviceType}' is not available in your account.
+              {"The '"}
+              {selectedDeviceType}
+              {"' is not available in your account."}
             </Text>
           </View>
         ) : (
@@ -712,7 +717,7 @@ export default function SettingsScreen() {
                 Edit Schedule
               </Text>
               <Text className="text-base text-center text-textLight mb-5">
-                Editing for{" "}
+                {"Editing for "}
                 <Text className="font-bold">
                   {dayMap[editingSchedule.day] || editingSchedule.day}
                 </Text>

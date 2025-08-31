@@ -199,16 +199,18 @@ export default function HistoryScreen() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-      setLogs([]);
-      setPagination((p) => ({ ...p, page: 1, total: 0 }));
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
   const fetchHistoryData = useCallback(
     async (pageToFetch: number) => {
-      if (pageToFetch === 1 && !isRefreshing) setIsLoading(true);
-      if (pageToFetch > 1) setIsFetchingMore(true);
+      if (pageToFetch === 1 && !isRefreshing) {
+        setIsLoading(true);
+      }
+      if (pageToFetch > 1) {
+        setIsFetchingMore(true);
+      }
       setError(null);
 
       try {
@@ -250,10 +252,12 @@ export default function HistoryScreen() {
             total: response.total,
             limit: response.limit,
           });
+        } else {
+          if (pageToFetch === 1) setLogs([]);
         }
       } catch (e) {
         const errorMessage =
-          e instanceof Error ? e.message : "Terjadi kesalahan tidak diketahui.";
+          e instanceof Error ? e.message : "An unknown error occurred.";
         setError(errorMessage);
         if (pageToFetch === 1) setLogs([]);
       } finally {
@@ -266,18 +270,17 @@ export default function HistoryScreen() {
   );
 
   useEffect(() => {
-    fetchHistoryData(1);
-  }, [activeFilter, debouncedSearchQuery, fetchHistoryData]);
-
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
+    setLogs([]);
+    setPagination((p) => ({ ...p, page: 1, total: 0 }));
     fetchHistoryData(1);
   }, [fetchHistoryData]);
 
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+  }, []);
+
   const handleSelectFilter = (filter: FilterType) => {
     setActiveFilter(filter);
-    setLogs([]);
-    setPagination((p) => ({ ...p, page: 1, total: 0 }));
   };
 
   const handleLoadMore = () => {
@@ -368,7 +371,7 @@ export default function HistoryScreen() {
             color={Colors.textLight}
           />
           <Text className="font-poppins-semibold text-lg text-text mt-4 text-center">
-            Gagal Memuat Riwayat
+            Failed to Load History
           </Text>
           <Text className="font-roboto-regular text-sm text-textLight mt-1 text-center">
             {error}
@@ -377,7 +380,7 @@ export default function HistoryScreen() {
             onPress={handleRefresh}
             className="mt-4 bg-primary/20 px-4 py-2 rounded-lg"
           >
-            <Text className="font-roboto-bold text-primary">Coba Lagi</Text>
+            <Text className="font-roboto-bold text-primary">Try Again</Text>
           </TouchableOpacity>
         </View>
       );
