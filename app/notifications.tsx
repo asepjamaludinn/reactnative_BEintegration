@@ -25,11 +25,12 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Tipe data yang digunakan oleh state dan UI komponen
 type NotificationEntry = {
-  id: string;
+  id: string; // Ini adalah ID dari NotificationRead
   isRead: boolean;
   notification: {
-    id: string;
+    id: string; // Ini adalah ID dari Notification
     title: string;
     message: string;
     sentAt: string;
@@ -37,6 +38,17 @@ type NotificationEntry = {
     device: {
       deviceName: string;
     };
+  };
+};
+
+type RawNotificationPayload = {
+  id: string;
+  title: string;
+  message: string;
+  sentAt: string;
+  type: "motion_detected" | "device_status_change" | "scheduled_reminder";
+  device: {
+    deviceName: string;
   };
 };
 
@@ -95,11 +107,26 @@ export default function NotificationsScreen() {
 
       if (socket) {
         socket.off("new_notification");
-        socket.on("new_notification", (newNotification: NotificationEntry) => {
-          console.log("Received new_notification event:", newNotification);
+
+        socket.on("new_notification", (payload: RawNotificationPayload) => {
+          console.log("Received new_notification event:", payload);
+
+          const formattedNotification: NotificationEntry = {
+            id: `${payload.id}-${Date.now()}`,
+            isRead: false,
+            notification: {
+              id: payload.id,
+              title: payload.title,
+              message: payload.message,
+              sentAt: payload.sentAt,
+              type: payload.type,
+              device: payload.device,
+            },
+          };
+
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setAllNotifications((prevNotifications) => [
-            newNotification,
+            formattedNotification,
             ...prevNotifications,
           ]);
         });

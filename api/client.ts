@@ -13,10 +13,9 @@ const getAuthToken = async () => {
 };
 
 /**
- * Fungsi terpusat untuk semua permintaan API.
  * @param endpoint - Path API setelah '/api', contoh: '/auth/login'.
  * @param method - Metode HTTP (GET, POST, PUT, PATCH, DELETE).
- * @param body - Body permintaan untuk metode POST, PUT, PATCH.
+ * @param body - Body permintaan. Bisa berupa objek biasa (untuk JSON) atau FormData (untuk upload file).
  * @param isProtected - Tentukan apakah endpoint ini memerlukan token otentikasi.
  */
 export const apiRequest = async (
@@ -26,9 +25,7 @@ export const apiRequest = async (
   isProtected: boolean = true
 ) => {
   try {
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-    };
+    const headers: HeadersInit = {};
 
     if (isProtected) {
       const token = await getAuthToken();
@@ -38,10 +35,21 @@ export const apiRequest = async (
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    let requestBody: BodyInit | null = null;
+
+    if (body) {
+      if (body instanceof FormData) {
+        requestBody = body;
+      } else {
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify(body);
+      }
+    }
+
     const response = await fetch(`${API_URL}/api${endpoint}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : null,
+      body: requestBody,
     });
 
     const responseData = await response.json();

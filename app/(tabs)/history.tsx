@@ -219,60 +219,37 @@ export default function HistoryScreen() {
           sortOrder: "desc",
         });
 
-        let implicitSearch = "";
         if (activeFilter === "motion")
           params.append("triggerType", API_PARAMS.TRIGGER_TYPE.MOTION);
         if (activeFilter === "schedule")
           params.append("triggerType", API_PARAMS.TRIGGER_TYPE.SCHEDULED);
         if (activeFilter === "manual")
           params.append("triggerType", API_PARAMS.TRIGGER_TYPE.MANUAL);
-        if (activeFilter === "lamp-on") {
+        if (activeFilter === "lamp-on")
           params.append("lightAction", API_PARAMS.LIGHT_ACTION.ON);
-          implicitSearch = "lamp";
-        }
-        if (activeFilter === "lamp-off") {
+        if (activeFilter === "lamp-off")
           params.append("lightAction", API_PARAMS.LIGHT_ACTION.OFF);
-          implicitSearch = "lamp";
-        }
-        if (activeFilter === "fan-on") {
+        if (activeFilter === "fan-on")
           params.append("fanAction", API_PARAMS.FAN_ACTION.ON);
-          implicitSearch = "fan";
-        }
-        if (activeFilter === "fan-off") {
+        if (activeFilter === "fan-off")
           params.append("fanAction", API_PARAMS.FAN_ACTION.OFF);
-          implicitSearch = "fan";
-        }
 
-        const finalSearchQuery =
-          `${implicitSearch} ${debouncedSearchQuery}`.trim();
-        if (finalSearchQuery) {
-          params.append("search", finalSearchQuery);
+        if (debouncedSearchQuery) {
+          params.append("search", debouncedSearchQuery);
         }
 
         const response = await getHistory(params);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
         if (response && response.data) {
-          // PERBAIKAN FINAL: Mencegah data duplikat masuk ke state
-          setLogs((prevLogs) => {
-            const existingLogs = pageToFetch === 1 ? [] : prevLogs;
-            const newLogs = response.data;
-            const combinedLogs = [...existingLogs, ...newLogs];
-            // Saring untuk mendapatkan log yang unik berdasarkan id
-            const uniqueLogs = combinedLogs.filter(
-              (log, index, self) =>
-                index === self.findIndex((l) => l.id === log.id)
-            );
-            return uniqueLogs;
-          });
-
+          setLogs((prevLogs) =>
+            pageToFetch === 1 ? response.data : [...prevLogs, ...response.data]
+          );
           setPagination({
             page: response.page,
             total: response.total,
             limit: response.limit,
           });
-        } else {
-          if (pageToFetch === 1) setLogs([]);
         }
       } catch (e) {
         const errorMessage =

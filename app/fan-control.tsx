@@ -154,6 +154,15 @@ export default function FanControlScreen() {
   const isFanOn = device.operationalStatus === "on";
   const isAutoMode = device.setting.autoModeEnabled;
 
+  const motionStatusText =
+    device.motionStatus === "detected"
+      ? "Detected"
+      : device.motionStatus === "clear"
+        ? "Clear"
+        : "-";
+  const motionStatusColor =
+    device.motionStatus === "detected" ? Colors.greenDot : Colors.textLight;
+
   return (
     <View
       className="flex-1 bg-secondary"
@@ -221,8 +230,8 @@ export default function FanControlScreen() {
             <StatusItem
               icon="body-outline"
               label="Person Status"
-              value={"-"}
-              color={Colors.textLight}
+              value={motionStatusText}
+              color={motionStatusColor}
             />
             <View className="w-px bg-border mx-2.5" />
             <StatusItem

@@ -5,6 +5,20 @@ export const getNotifications = () => {
 };
 
 /**
+ * Mendapatkan jumlah notifikasi yang belum dibaca.
+ */
+export const getUnreadCount = () => {
+  return apiRequest("/notifications/unread-count", "GET");
+};
+
+/**
+ * Menandai semua notifikasi sebagai sudah dibaca.
+ */
+export const markAllAsRead = () => {
+  return apiRequest("/notifications/mark-all-as-read", "POST");
+};
+
+/**
  * Menghapus notifikasi berdasarkan ID-nya (NotificationRead ID).
  * @param notificationReadId
  */

@@ -12,6 +12,7 @@ import { getSocket, initializeSocket } from "../utils/socket";
 
 interface Device {
   id: string;
+  uniqueId: string;
   deviceName: string;
   deviceTypes: ("lamp" | "fan")[];
   status: "online" | "offline";
@@ -20,6 +21,7 @@ interface Device {
     scheduleEnabled: boolean;
   };
   operationalStatus?: "on" | "off";
+  motionStatus?: "detected" | "clear";
 }
 
 interface DeviceContextType {
@@ -53,6 +55,7 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
       socket.off("device_added");
       socket.off("settings_updated");
       socket.off("device_operational_status_updated");
+      socket.off("motion_status_updated");
 
       socket.on("devices_updated", (updatedDevices: Device[]) => {
         setDevices((prevDevices) => {
@@ -85,6 +88,19 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
           )
         );
       });
+
+      socket.on(
+        "motion_status_updated",
+        (data: { uniqueId: string; motionStatus: "detected" | "clear" }) => {
+          setDevices((prevDevices) =>
+            prevDevices.map((device) =>
+              device.uniqueId === data.uniqueId
+                ? { ...device, motionStatus: data.motionStatus }
+                : device
+            )
+          );
+        }
+      );
     }
 
     setIsLoading(false);

@@ -6,6 +6,7 @@ import { StatusBar, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/Colors";
 import { DeviceProvider } from "../context/DeviceContext";
+import { NotificationProvider } from "../context/NotificationContext";
 import "../global.css";
 import { useLoadFonts } from "../hooks/useLoadFonts";
 
@@ -100,31 +101,33 @@ export default function RootLayout() {
   }
 
   return (
-    <DeviceProvider>
-      <StatusBar barStyle="light-content" />
-      <Stack
-        screenOptions={{
-          header: ({ options, navigation, route }) => (
-            <Header options={options} navigation={navigation} route={route} />
-          ),
-          headerShown: true,
-        }}
-      >
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="(auth)"
-          options={{
-            headerShown: false,
-            animation: "fade",
-            animationDuration: 500,
+    <NotificationProvider>
+      <DeviceProvider>
+        <StatusBar barStyle="light-content" />
+        <Stack
+          screenOptions={{
+            header: ({ options, navigation, route }) => (
+              <Header options={options} navigation={navigation} route={route} />
+            ),
+            headerShown: true,
           }}
-        />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="account-settings" options={{ title: "" }} />
-        <Stack.Screen name="lamp-control" options={{ title: "" }} />
-        <Stack.Screen name="fan-control" options={{ title: "" }} />
-        <Stack.Screen name="notifications" options={{ title: "" }} />
-      </Stack>
-    </DeviceProvider>
+        >
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="(auth)"
+            options={{
+              headerShown: false,
+              animation: "fade",
+              animationDuration: 500,
+            }}
+          />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="account-settings" options={{ title: "" }} />
+          <Stack.Screen name="lamp-control" options={{ title: "" }} />
+          <Stack.Screen name="fan-control" options={{ title: "" }} />
+          <Stack.Screen name="notifications" options={{ title: "" }} />
+        </Stack>
+      </DeviceProvider>
+    </NotificationProvider>
   );
 }

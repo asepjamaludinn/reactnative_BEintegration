@@ -3,13 +3,14 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import LogoD from "../../assets/images/D.svg";
 import CustomTabBar from "../../components/navigation/CustomTabBar";
 import { Colors } from "../../constants/Colors";
+import { useNotifications } from "../../context/NotificationContext";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotifications();
 
   return (
     <Tabs
@@ -31,9 +32,7 @@ export default function TabLayout() {
               {/* Left Container */}
               <View className="flex-1 items-start translate-y-1">
                 {isHome ? (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("home")}
-                  >
+                  <TouchableOpacity onPress={() => navigation.navigate("home")}>
                     <LogoD width={40} height={40} />
                   </TouchableOpacity>
                 ) : (
@@ -64,15 +63,21 @@ export default function TabLayout() {
               {/* Right Container */}
               <View className="flex-1 flex-row items-center justify-end translate-y-0.5">
                 <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate("notifications" as never)
-                  }
+                  onPress={() => navigation.navigate("notifications" as never)}
                 >
                   <Ionicons
                     name="notifications-outline"
                     size={29}
                     color={iconColor}
                   />
+
+                  {unreadCount > 0 && (
+                    <View className="absolute -top-1 -right-1 bg-redDot w-5 h-5 rounded-full justify-center items-center border-2 border-white">
+                      <Text className="text-white text-xs font-bold">
+                        {unreadCount}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   className="ml-4"

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
-import { API_URL, apiRequest } from "./client";
+import { apiRequest } from "./client";
 
 export type UserRole = "SUPERUSER" | "USER";
 
@@ -57,30 +57,9 @@ export const updateProfile = async (updateData: {
   return apiRequest("/auth/profile", "PUT", updateData, true);
 };
 
+/**
+ * @param formData - Objek FormData yang berisi file gambar.
+ */
 export const uploadProfilePicture = async (formData: FormData) => {
-  try {
-    const token = await AsyncStorage.getItem("userToken");
-    if (!token) throw new Error("Authentication token not found.");
-
-    const response = await fetch(`${API_URL}/api/auth/upload-profile-picture`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const responseData = await response.json();
-    if (!response.ok) {
-      const errorMessage =
-        responseData.error || "An unexpected error occurred.";
-      Alert.alert("Error", errorMessage);
-      return null;
-    }
-    return responseData;
-  } catch (error: any) {
-    console.error(`API request failed: ${error.message}`);
-    Alert.alert("Connection Error", "Could not connect to the server.");
-    return null;
-  }
+  return apiRequest("/auth/upload-profile-picture", "POST", formData, true);
 };
