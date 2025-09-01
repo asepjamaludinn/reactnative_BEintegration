@@ -32,7 +32,7 @@ export default function AppEntry() {
 
           if (justLoggedOut === "true") {
             await AsyncStorage.removeItem("justLoggedOut");
-            setInitialRoute("/(auth)/ip-device");
+            setInitialRoute("/(auth)/login");
           } else {
             setInitialRoute("/(auth)/onboarding");
           }
