@@ -11,7 +11,7 @@ type LogType =
   | "fan-on"
   | "fan-off"
   | "schedule"
-  | "automatic";
+  | "manual";
 export type FilterType = "All" | LogType;
 
 type FilterOption = {
@@ -32,7 +32,7 @@ const logStyleConfig: Record<LogType, { dotColor: string }> = {
   "fan-on": { dotColor: Colors.fanOnColor },
   "fan-off": { dotColor: Colors.fanOffColor },
   schedule: { dotColor: "#FFC107" },
-  automatic: { dotColor: "#9C27B0" },
+  manual: { dotColor: "#9C27B0" },
 };
 
 // --- Props Interface ---
