@@ -559,7 +559,7 @@ export default function SettingsScreen() {
   const renderListHeader = useCallback(
     () => (
       <>
-        <View className="items-center my-5">
+        <View className="items-center mt-16 mb-7">
           <Image
             source={
               profileData?.profilePict
@@ -583,7 +583,6 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
         <View className="flex-row bg-white/70 rounded-full p-0.5 mb-5">
           <TouchableOpacity
             className={`flex-1 py-3 rounded-full ${
@@ -616,7 +615,6 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
         <View>
           <ScheduleForm
             selectedDevice={selectedDeviceType}
@@ -626,7 +624,6 @@ export default function SettingsScreen() {
           />
           {isCurrentDeviceAuto && <AutoModeOverlay />}
         </View>
-
         <View className="mt-3">
           <Text className="text-xl mb-3 font-bold text-text">
             Saved Schedules

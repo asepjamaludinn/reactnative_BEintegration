@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -22,6 +22,11 @@ type Device = {
   deviceTypes: ("lamp" | "fan")[];
 };
 
+type UserData = {
+  id: string;
+  username: string;
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -30,16 +35,23 @@ export default function HomeScreen() {
   const [time, setTime] = useState("");
   const [userName, setUserName] = useState("User");
 
+  // [MODIFIKASI] Menggunakan useFocusEffect untuk memuat ulang data profil
+  // setiap kali layar ini mendapatkan fokus (misalnya, saat kembali dari halaman lain).
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfileData = async () => {
+        const profileResponse = await getProfile();
+        if (profileResponse && profileResponse.user) {
+          setUserName(profileResponse.user.username);
+        }
+      };
+
+      loadProfileData();
+    }, [])
+  );
+
+  // useEffect ini tetap ada untuk menangani jam yang berjalan
   useEffect(() => {
-    const loadProfileData = async () => {
-      const profileResponse = await getProfile();
-      if (profileResponse && profileResponse.user) {
-        setUserName(profileResponse.user.username);
-      }
-    };
-
-    loadProfileData();
-
     const timer = setInterval(() => {
       const now = new Date();
       setTime(

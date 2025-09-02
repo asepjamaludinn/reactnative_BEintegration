@@ -26,6 +26,7 @@ const TRACK_HEIGHT = 40;
 const THUMB_SIZE = 32;
 const PADDING = 4;
 
+// Komponen CustomSwitch (tidak ada perubahan)
 interface CustomSwitchProps {
   value: boolean;
   onValueChange: () => void;
@@ -82,6 +83,7 @@ const CustomSwitch: React.FC<CustomSwitchProps> = ({
   );
 };
 
+// Komponen StatusItem (tidak ada perubahan)
 const StatusItem: React.FC<{
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -109,8 +111,8 @@ export default function FanControlScreen() {
   const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
   const router = useRouter();
 
-  const { getDeviceById, isLoading: isContextLoading } = useDevices();
-
+  // --- [PERBAIKAN] Ambil seluruh daftar 'devices' dari context ---
+  const { devices, getDeviceById, isLoading: isContextLoading } = useDevices();
   const [isActionLoading, setActionLoading] = useState(false);
 
   const device = getDeviceById(deviceId);
@@ -151,17 +153,23 @@ export default function FanControlScreen() {
     );
   }
 
+  const motionDevice = devices.find(
+    (d) => d.uniqueId === device.uniqueId && d.motionStatus
+  );
+
   const isFanOn = device.operationalStatus === "on";
   const isAutoMode = device.setting.autoModeEnabled;
 
   const motionStatusText =
-    device.motionStatus === "detected"
+    motionDevice?.motionStatus === "detected"
       ? "Detected"
-      : device.motionStatus === "clear"
+      : motionDevice?.motionStatus === "clear"
         ? "Clear"
         : "-";
   const motionStatusColor =
-    device.motionStatus === "detected" ? Colors.greenDot : Colors.textLight;
+    motionDevice?.motionStatus === "detected"
+      ? Colors.greenDot
+      : Colors.textLight;
 
   return (
     <View
@@ -204,7 +212,9 @@ export default function FanControlScreen() {
           <View className="w-[50px] h-[5px] bg-border rounded-full mb-6" />
 
           <TouchableOpacity
-            className={`w-24 h-24 rounded-full justify-center items-center bg-secondary shadow-lg shadow-primary/30 mb-2.5 border-2 border-white ${isAutoMode ? "bg-border" : ""}`}
+            className={`w-24 h-24 rounded-full justify-center items-center bg-secondary shadow-lg shadow-primary/30 mb-2.5 border-2 border-white ${
+              isAutoMode ? "bg-border" : ""
+            }`}
             onPress={handleFanToggle}
             disabled={isAutoMode || isActionLoading}
             activeOpacity={0.7}

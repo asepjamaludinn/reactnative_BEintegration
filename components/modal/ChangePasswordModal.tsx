@@ -14,6 +14,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSubmit: (passwords: { current: string; new: string }) => void;
+  isSubmitting: boolean;
 };
 
 export const ChangePasswordModal: React.FC<Props> = ({

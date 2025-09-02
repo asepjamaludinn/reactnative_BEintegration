@@ -15,6 +15,7 @@ type Props = {
   onClose: () => void;
   onSubmit: (newName: string) => void;
   currentName: string;
+  isSubmitting: boolean;
 };
 
 export const ChangeNameModal: React.FC<Props> = ({

@@ -29,6 +29,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Konstanta dan Tipe data (tidak ada perubahan)
 const API_PARAMS = {
   TRIGGER_TYPE: {
     MOTION: "motion_detected",
@@ -115,8 +116,9 @@ const LogItem: React.FC<LogItemData> = ({ type, message, time }) => {
   if (!style) return null;
 
   return (
+    // [MODIFIKASI] Menambahkan shadow halus pada setiap item
     <View
-      className="flex-row items-center rounded-2xl p-3 mb-2.5 border-l-4"
+      className="flex-row items-center rounded-2xl p-3 mb-2.5 border-l-4 shadow-md shadow-black/5"
       style={{ backgroundColor: style.bgColor, borderColor: style.dotColor }}
     >
       <View
@@ -124,14 +126,17 @@ const LogItem: React.FC<LogItemData> = ({ type, message, time }) => {
         style={{ backgroundColor: style.dotColor }}
       />
       <View className="flex-1 flex-row justify-between items-start">
-        <View className="flex-1">
+        <View className="flex-1 mr-2">
           <Text
             className="font-roboto-bold text-[15px] mb-0.5"
             style={{ color: style.dotColor }}
           >
             {style.title}
           </Text>
-          <Text className="font-roboto-regular text-[13px] text-text">
+          <Text
+            className="font-roboto-regular text-[13px] text-text"
+            numberOfLines={2}
+          >
             {message}
           </Text>
         </View>
@@ -161,7 +166,7 @@ export default function HistoryScreen() {
   const [pagination, setPagination] = useState({
     page: 1,
     total: 0,
-    limit: 10,
+    limit: 15,
   });
 
   useEffect(() => {
@@ -205,16 +210,12 @@ export default function HistoryScreen() {
 
   const fetchHistoryData = useCallback(
     async (pageToFetch: number) => {
-      if (pageToFetch === 1 && !isRefreshing) {
-        setIsLoading(true);
-      }
-      if (pageToFetch > 1) {
-        setIsFetchingMore(true);
-      }
+      if (pageToFetch === 1 && !isRefreshing) setIsLoading(true);
+      if (pageToFetch > 1) setIsFetchingMore(true);
       setError(null);
 
       try {
-        const params = new URLSearchParams({
+        const queryParams = new URLSearchParams({
           page: String(pageToFetch),
           limit: String(pagination.limit),
           sortBy: "createdAt",
@@ -222,43 +223,35 @@ export default function HistoryScreen() {
         });
 
         if (activeFilter === "motion")
-          params.append("triggerType", API_PARAMS.TRIGGER_TYPE.MOTION);
+          queryParams.append("triggerType", API_PARAMS.TRIGGER_TYPE.MOTION);
         if (activeFilter === "schedule")
-          params.append("triggerType", API_PARAMS.TRIGGER_TYPE.SCHEDULED);
+          queryParams.append("triggerType", API_PARAMS.TRIGGER_TYPE.SCHEDULED);
         if (activeFilter === "manual")
-          params.append("triggerType", API_PARAMS.TRIGGER_TYPE.MANUAL);
+          queryParams.append("triggerType", API_PARAMS.TRIGGER_TYPE.MANUAL);
         if (activeFilter === "lamp-on")
-          params.append("lightAction", API_PARAMS.LIGHT_ACTION.ON);
+          queryParams.append("lightAction", API_PARAMS.LIGHT_ACTION.ON);
         if (activeFilter === "lamp-off")
-          params.append("lightAction", API_PARAMS.LIGHT_ACTION.OFF);
+          queryParams.append("lightAction", API_PARAMS.LIGHT_ACTION.OFF);
         if (activeFilter === "fan-on")
-          params.append("fanAction", API_PARAMS.FAN_ACTION.ON);
+          queryParams.append("fanAction", API_PARAMS.FAN_ACTION.ON);
         if (activeFilter === "fan-off")
-          params.append("fanAction", API_PARAMS.FAN_ACTION.OFF);
+          queryParams.append("fanAction", API_PARAMS.FAN_ACTION.OFF);
+        if (debouncedSearchQuery)
+          queryParams.append("search", debouncedSearchQuery);
 
-        if (debouncedSearchQuery) {
-          params.append("search", debouncedSearchQuery);
-        }
-
-        const response = await getHistory(params);
+        const response = await getHistory(queryParams);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
         if (response && response.data) {
-          setLogs((prevLogs) =>
-            pageToFetch === 1 ? response.data : [...prevLogs, ...response.data]
+          setLogs((prev) =>
+            pageToFetch === 1 ? response.data : [...prev, ...response.data]
           );
-          setPagination({
-            page: response.page,
-            total: response.total,
-            limit: response.limit,
-          });
-        } else {
-          if (pageToFetch === 1) setLogs([]);
+          setPagination({ ...response });
+        } else if (pageToFetch === 1) {
+          setLogs([]);
         }
       } catch (e) {
-        const errorMessage =
-          e instanceof Error ? e.message : "An unknown error occurred.";
-        setError(errorMessage);
+        setError(e instanceof Error ? e.message : "An unknown error occurred.");
         if (pageToFetch === 1) setLogs([]);
       } finally {
         setIsLoading(false);
@@ -273,24 +266,25 @@ export default function HistoryScreen() {
     setLogs([]);
     setPagination((p) => ({ ...p, page: 1, total: 0 }));
     fetchHistoryData(1);
-  }, [fetchHistoryData]);
+  }, [activeFilter, debouncedSearchQuery]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-  }, []);
+    fetchHistoryData(1);
+  }, [fetchHistoryData]);
 
   const handleSelectFilter = (filter: FilterType) => {
     setActiveFilter(filter);
+    setFilterVisible(false); 
   };
-
   const handleLoadMore = () => {
     if (!isFetchingMore && logs.length < pagination.total) {
-      const nextPage = pagination.page + 1;
-      fetchHistoryData(nextPage);
+      fetchHistoryData(pagination.page + 1);
     }
   };
 
   const groupedLogs = useMemo(() => {
+    // ... (Logika grouping tidak berubah)
     const grouped: { [key: string]: HistoryLogFromAPI[] } = {};
     logs.forEach((log) => {
       const dateKey = new Date(log.createdAt).toLocaleDateString("en-GB", {
@@ -311,10 +305,10 @@ export default function HistoryScreen() {
   }, [logs]);
 
   const renderLogItem = ({ item }: { item: HistoryLogFromAPI }) => {
+    // ... (Logika render item tidak berubah)
     const isLamp = item.device.deviceName.toLowerCase().includes("lamp");
     let type: LogItemData["type"] | null = null;
     let message = "";
-
     if (item.triggerType === "motion_detected") {
       type = "motion";
       message = `Motion detected near ${item.device.deviceName}`;
@@ -325,7 +319,6 @@ export default function HistoryScreen() {
       type = "manual";
       message = `${item.device.deviceName} controlled manually`;
     }
-
     if (isLamp) {
       if (item.lightAction === "turned_on") type = "lamp-on";
       if (item.lightAction === "turned_off") type = "lamp-off";
@@ -333,7 +326,6 @@ export default function HistoryScreen() {
       if (item.fanAction === "turned_on") type = "fan-on";
       if (item.fanAction === "turned_off") type = "fan-off";
     }
-
     if (!message && type) {
       const actionText = (isLamp ? item.lightAction : item.fanAction).replace(
         "_",
@@ -341,27 +333,25 @@ export default function HistoryScreen() {
       );
       message = `${item.device.deviceName} was ${actionText}`;
     }
-
     const time = new Date(item.createdAt).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
-
     if (!type) return null;
     return <LogItem type={type} message={message} time={time} />;
   };
 
-  const renderContent = () => {
+  const renderList = () => {
     if (isLoading) {
       return (
-        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
-          {[...Array(5)].map((_, index) => (
+        <View style={{ padding: 20 }}>
+          {[...Array(8)].map((_, index) => (
             <SkeletonItem key={index} />
           ))}
         </View>
       );
     }
-
+    // ... (Render error dan empty state tidak berubah)
     if (error) {
       return (
         <View className="flex-1 justify-center items-center pb-20 px-5">
@@ -403,18 +393,24 @@ export default function HistoryScreen() {
     return (
       <SectionList
         sections={groupedLogs}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
+        keyExtractor={(item) => item.id}
         renderItem={renderLogItem}
         renderSectionHeader={({ section: { title } }) => (
-          <Text className="font-poppins-bold text-lg text-text mb-4 px-1 mt-4">
-            {title}
-          </Text>
+          <View className="py-2 mb-2 bg-background">
+            <Text className="font-poppins-bold text-lg text-black">
+              {title}
+            </Text>
+          </View>
         )}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+        stickySectionHeadersEnabled={true}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 120,
+        }}
         showsVerticalScrollIndicator={false}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={() =>
+        ListFooterComponent={
           isFetchingMore ? (
             <ActivityIndicator
               size="small"
@@ -432,18 +428,18 @@ export default function HistoryScreen() {
   return (
     <View className="flex-1 bg-background">
       <View
-        className="px-5 pb-4 bg-background"
-        style={{ paddingTop: insets.top }}
+        className="px-5 pb-4"
+        style={{ paddingTop: insets.top, backgroundColor: Colors.background }}
       >
         <Text
-          className="font-poppins-medium text-3xl text-text mt-20 mb-6"
+          className="font-poppins-medium text-3xl text-text mt-20 mb-5"
           style={{
             textShadowColor: "rgba(0, 0, 0, 0.25)",
             textShadowOffset: { width: 1, height: 2 },
             textShadowRadius: 3,
           }}
         >
-          History
+          Room History
         </Text>
         <View className="flex-row items-center bg-white rounded-2xl px-4 h-14 shadow-md shadow-black/10">
           <Ionicons name="search-outline" size={22} color={Colors.textLight} />
@@ -463,7 +459,7 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {renderContent()}
+      {renderList()}
 
       <FilterModal
         visible={isFilterVisible}

@@ -52,9 +52,15 @@ export const storeUserSession = async (token: string, role: UserRole) => {
 
 export const updateProfile = async (updateData: {
   username?: string;
-  password?: string;
+  currentPassword?: string;
+  newPassword?: string;
 }) => {
-  return apiRequest("/auth/profile", "PUT", updateData, true);
+  const payload = {
+    username: updateData.username,
+    currentPassword: updateData.currentPassword,
+    newPassword: updateData.newPassword,
+  };
+  return apiRequest("/auth/profile", "PUT", payload, true);
 };
 
 /**

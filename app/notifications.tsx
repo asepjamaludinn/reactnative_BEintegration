@@ -168,10 +168,10 @@ export default function NotificationsScreen() {
         activeOpacity={0.8}
         onPress={() => handleNotificationPress(data.item)}
       >
-        <View className="bg-white rounded-xl p-4 flex-row items-center mb-3 shadow shadow-black/5 border border-gray-100">
+        <View className="bg-primary rounded-xl p-4 flex-row items-center mb-3 shadow shadow-black/5 border border-gray-100">
           <View
             className={`w-12 h-12 rounded-full justify-center items-center mr-4 ${
-              data.item.isRead ? "bg-gray-100" : "bg-primary/10"
+              data.item.isRead ? "bg-gray-100" : "bg-white"
             }`}
           >
             <Ionicons
@@ -183,14 +183,14 @@ export default function NotificationsScreen() {
           <View className="flex-1">
             <Text
               className={`text-base leading-5 font-poppins-semibold ${
-                data.item.isRead ? "text-textLight" : "text-text"
+                data.item.isRead ? "text-white" : "text-white"
               }`}
             >
               {data.item.notification.title}
             </Text>
             <Text
               className={`text-sm leading-5 font-roboto-regular mt-0.5 ${
-                data.item.isRead ? "text-textLight" : "text-text"
+                data.item.isRead ? "text-white" : "text-white"
               }`}
               numberOfLines={2}
             >
@@ -198,7 +198,7 @@ export default function NotificationsScreen() {
             </Text>
             <Text
               className={`text-xs mt-1.5 font-roboto-regular ${
-                data.item.isRead ? "text-textLight/70" : "text-textLight"
+                data.item.isRead ? "text-white" : "text-white"
               }`}
             >
               {formatSentAt(data.item.notification.sentAt)}

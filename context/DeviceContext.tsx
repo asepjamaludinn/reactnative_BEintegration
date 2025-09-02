@@ -67,9 +67,11 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
           );
         });
       });
+
       socket.on("device_added", (newDevice: Device) => {
         setDevices((prev) => [...prev, newDevice]);
       });
+
       socket.on("settings_updated", (updatedSettings: any) => {
         setDevices((prevDevices) =>
           prevDevices.map((device) =>
@@ -79,6 +81,7 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
           )
         );
       });
+
       socket.on("device_operational_status_updated", (data: any) => {
         setDevices((prevDevices) =>
           prevDevices.map((device) =>

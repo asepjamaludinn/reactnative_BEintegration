@@ -69,7 +69,7 @@ const AccountSettingsScreen: React.FC = () => {
             await AsyncStorage.setItem("justLoggedOut", "true");
           }
           await AsyncStorage.multiRemove(["userToken", "userRole"]);
-          router.replace("/(auth)/login");
+          router.replace("/(auth)/onboarding");
         },
       },
     ]);
@@ -121,10 +121,21 @@ const AccountSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleSubmitPasswordChange = async (passwords: { new: string }) => {
+  // --- [PERBAIKAN] ---
+  // Fungsi ini sekarang mengirimkan password lama dan baru ke API
+  const handleSubmitPasswordChange = async (passwords: {
+    current: string;
+    new: string;
+  }) => {
     setIsSubmitting(true);
-    const response = await updateProfile({ password: passwords.new });
+    const response = await updateProfile({
+      currentPassword: passwords.current,
+      newPassword: passwords.new,
+    });
     setIsSubmitting(false);
+
+    // Jika response tidak null, berarti sukses.
+    // Jika gagal, apiRequest sudah menampilkan alert error dari backend.
     if (response) {
       setPasswordModalVisible(false);
       Alert.alert("Success", "Your password has been changed successfully!");
